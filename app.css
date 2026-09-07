@@ -560,3 +560,72 @@ body.page-riego .settings-section-visual .form-group:last-child { margin-bottom:
   }
   body.page-riego .floating-tools-btn svg { width: 16px; height: 16px; }
 }
+
+
+/* ==========================================================
+   RIEGO · SECTORES / ELECTROVÁLVULAS V3
+   ========================================================== */
+body.page-riego .zone-identity-card {
+  padding: 14px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 78%, var(--bg));
+}
+body.page-riego .zone-hardware-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(110px, .7fr);
+  gap: 12px;
+}
+body.page-riego .zone-hardware-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+body.page-riego .zone-hardware-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: var(--success);
+}
+body.page-riego .zone-section-label {
+  margin: 6px 0 12px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+body.page-riego .zone-save-btn,
+body.page-riego .manual-start-btn {
+  margin-top: 12px;
+  border: none;
+  background: var(--primary);
+  color: var(--primary-text);
+}
+body.page-riego .manual-start-btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+body.page-riego .manual-sector-detail {
+  min-height: 18px;
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+@media (max-width: 430px) {
+  body.page-riego .zone-hardware-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}

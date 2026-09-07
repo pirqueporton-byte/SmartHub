@@ -309,7 +309,31 @@
 
         <!-- CONTENIDO 2: FORMULARIO ZONA -->
         <div id="panel-zone" style="display:none;">
-          <div class="form-group"><label>Días Activos</label>
+          <div class="zone-identity-card">
+            <div class="form-group">
+              <label>Nombre del sector</label>
+              <input type="text" id="z-name" class="form-input" maxlength="40" placeholder="Ej. Jardín piscina">
+            </div>
+
+            <div class="zone-hardware-grid">
+              <div class="form-group">
+                <label>Electroválvula</label>
+                <select id="z-valvula" class="form-input" onchange="actualizarInfoValvulaZona()"></select>
+              </div>
+              <div class="form-group">
+                <label>Cantidad de aspersores</label>
+                <input type="number" id="z-aspersores" class="form-input" min="0" max="99" step="1" value="0">
+              </div>
+            </div>
+
+            <div id="z-hardware-info" class="zone-hardware-info">
+              <span class="zone-hardware-dot"></span>
+              <span>Selecciona una electroválvula</span>
+            </div>
+          </div>
+
+          <div class="zone-section-label">Programación</div>
+          <div class="form-group"><label>Días activos</label>
             <div class="days-grid">
               <button class="day-btn" data-day="1" onclick="toggleDia(this)">L</button><button class="day-btn" data-day="2" onclick="toggleDia(this)">M</button>
               <button class="day-btn" data-day="3" onclick="toggleDia(this)">M</button><button class="day-btn" data-day="4" onclick="toggleDia(this)">J</button>
@@ -318,18 +342,20 @@
             </div>
           </div>
           <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
-            <div class="form-group"><label>Hora Inicio</label><input type="time" id="z-hora" class="form-input"></div>
-            <div class="form-group"><label>Minutos</label><input type="number" id="z-dur" class="form-input"></div>
+            <div class="form-group"><label>Hora de inicio</label><input type="time" id="z-hora" class="form-input"></div>
+            <div class="form-group"><label>Duración (min)</label><input type="number" id="z-dur" class="form-input" min="1" max="120"></div>
           </div>
-          <div class="form-group"><label>Color del Sector</label>
+
+          <div class="zone-section-label">Apariencia</div>
+          <div class="form-group"><label>Color del sector</label>
             <div style="display:flex; gap:8px;">
               <input type="color" id="z-color" class="form-input" style="padding:2px; height:44px; cursor:pointer;">
-              <button class="btn-outline" style="width:auto; padding:0 14px; font-size:16px;" onclick="usarCuentagotas('z-color')" title="Clonar Color">💧</button>
+              <button class="btn-outline" style="width:auto; padding:0 14px; font-size:16px;" onclick="usarCuentagotas('z-color')" title="Clonar color">💧</button>
             </div>
           </div>
-          <button class="btn-outline" style="margin-top:16px; background:var(--text-main); color:var(--bg);" onclick="guardarZona()">Guardar Cambios</button>
+          <button class="btn-outline zone-save-btn" onclick="guardarZona()">Guardar sector</button>
           <hr style="border:0; border-top:1px solid var(--border); width:100%; margin:20px 0;">
-          <button class="btn-outline btn-danger" onclick="eliminarItem('zone')">Eliminar Sector</button>
+          <button class="btn-outline btn-danger" onclick="eliminarItem('zone')">Eliminar sector</button>
         </div>
 
         <!-- CONTENIDO 3: FORMULARIO MARCADOR -->
@@ -405,14 +431,15 @@
           <div class="form-group">
             <label>Regar Ahora (Manual)</label>
             <div class="form-group" style="margin-bottom:8px;">
-              <label style="font-size:10px;">Seleccionar Sector / Válvula</label>
+              <label style="font-size:10px;">Sector de riego</label>
               <select id="man-sector" class="form-input"></select>
+              <div id="man-sector-detail" class="manual-sector-detail">Selecciona un sector configurado.</div>
             </div>
             <div class="form-group" style="margin-bottom:12px;">
               <label style="font-size:10px;">Minutos de Duración</label>
               <input type="number" id="man-minutos" class="form-input" value="5" min="1" max="120">
             </div>
-            <button class="btn-outline" style="background:var(--primary); color:var(--primary-text); border:none;" onclick="enviarRiegoManual()">🚿 Iniciar Riego Manual</button>
+            <button id="btn-manual-start" class="btn-outline manual-start-btn" onclick="enviarRiegoManual()">Iniciar riego manual</button>
           </div>
         </div>
 
@@ -497,6 +524,99 @@ const imgEl = document.getElementById('map-image'); const svgEl = document.getEl
 let mapState = { mode: 'pan', view: 'map', scale: 1, tx: 0, ty: 0, isDragging: false, startX: 0, startY: 0, clickX: 0, clickY: 0, imgWidth: 0, imgHeight: 0, circleCenter: null, tempRadius: 0 };
 let perimeter = []; let zones = []; let markers = []; let currentDraw = []; let selectedItem = { type: null, id: null }; let draggingMarkerId = null;
 
+/*
+ * Correspondencia física del sistema de riego.
+ * La ESP32 usa sector base 0: Válvula 1 => sector 0 ... Válvula 8 => sector 7.
+ */
+const RIEGO_HARDWARE = [
+  { valvula: 1, rele: 1, in: 1, gpio: 13 },
+  { valvula: 2, rele: 2, in: 2, gpio: 14 },
+  { valvula: 3, rele: 3, in: 3, gpio: 27 },
+  { valvula: 4, rele: 4, in: 4, gpio: 26 },
+  { valvula: 5, rele: 5, in: 5, gpio: 25 },
+  { valvula: 6, rele: 6, in: 6, gpio: 33 },
+  { valvula: 7, rele: 7, in: 7, gpio: 32 },
+  { valvula: 8, rele: 8, in: 8, gpio: 23 }
+];
+
+function getHardwareValvula(numero) {
+  return RIEGO_HARDWARE.find(v => v.valvula === Number(numero)) || null;
+}
+
+function getZoneValve(z, indexFallback = -1) {
+  const explicit = Number(z?.config?.valvula);
+  if (Number.isInteger(explicit) && explicit >= 1 && explicit <= 8) return explicit;
+  if (indexFallback >= 0 && indexFallback < 8) return indexFallback + 1;
+  return null;
+}
+
+function getZoneSprinklers(z) {
+  const n = Number(z?.config?.aspersores);
+  return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : 0;
+}
+
+function getFirstAvailableValve(ignoreZoneId = null) {
+  const used = new Set();
+  zones.forEach((zone, idx) => {
+    if (zone?.id === ignoreZoneId) return;
+    const v = getZoneValve(zone, idx);
+    if (v) used.add(v);
+  });
+  for (let v = 1; v <= 8; v++) if (!used.has(v)) return v;
+  return null;
+}
+
+function populateValveSelector(selectedValve, currentZoneId) {
+  const select = document.getElementById('z-valvula');
+  if (!select) return;
+
+  const usedByOthers = new Set();
+  zones.forEach((zone, idx) => {
+    if (zone?.id === currentZoneId) return;
+    const v = getZoneValve(zone, idx);
+    if (v) usedByOthers.add(v);
+  });
+
+  select.innerHTML = '';
+  RIEGO_HARDWARE.forEach(hw => {
+    const opt = document.createElement('option');
+    opt.value = hw.valvula;
+    opt.textContent = `Electroválvula ${hw.valvula} · Relé ${hw.rele} · GPIO ${hw.gpio}`;
+    opt.disabled = usedByOthers.has(hw.valvula);
+    if (Number(selectedValve) === hw.valvula) opt.selected = true;
+    select.appendChild(opt);
+  });
+
+  if (!selectedValve || usedByOthers.has(Number(selectedValve))) {
+    const first = getFirstAvailableValve(currentZoneId);
+    if (first) select.value = String(first);
+  }
+  actualizarInfoValvulaZona();
+}
+
+function actualizarInfoValvulaZona() {
+  const select = document.getElementById('z-valvula');
+  const info = document.getElementById('z-hardware-info');
+  if (!select || !info) return;
+  const hw = getHardwareValvula(select.value);
+  if (!hw) return;
+  info.innerHTML = `<span class="zone-hardware-dot"></span><span>Electroválvula ${hw.valvula} → IN${hw.in} / Relé ${hw.rele} → GPIO ${hw.gpio}</span>`;
+}
+
+function findZoneByHardwareSector(sector) {
+  const valve = Number(sector) + 1;
+  let found = null;
+  zones.some((z, idx) => {
+    if (getZoneValve(z, idx) === valve) {
+      found = { zone: z, index: idx, valve };
+      return true;
+    }
+    return false;
+  });
+  return found;
+}
+
+
 const firebaseConfig = { apiKey: "AIzaSyCABy9Rpn1wc1gYBzDEm8Mf05x0gu9lpyQ", authDomain: "portonpirque.firebaseapp.com", databaseURL: "https://portonpique-default-rtdb.firebaseio.com/", projectId: "portonpirque" };
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth(); const db = firebase.database(); const ADMIN_EMAIL = "pirqueporton@gmail.com";
@@ -565,9 +685,12 @@ function renderEstadoEnVivo() {
   }
 
   const sectorIdx = Number.isFinite(Number(estado.sector)) ? Number(estado.sector) : 0;
-  const zName = zones[sectorIdx]
-    ? (zones[sectorIdx].name || `Sector ${sectorIdx + 1}`)
-    : `Relé ${sectorIdx + 1}`;
+  const active = findZoneByHardwareSector(sectorIdx);
+  const activeValve = sectorIdx + 1;
+  const activeZone = active?.zone || null;
+  const zName = activeZone
+    ? `${activeZone.name || `Sector ${activeValve}`} · Válvula ${activeValve}`
+    : `Válvula ${activeValve}`;
 
   if (estado.regando) {
     badge.textContent = estado.modo === "manual" ? "Regando manual 💧" : "Regando 💧";
@@ -711,8 +834,24 @@ wrapper.addEventListener('pointerup', (e) => {
     if (mapState.tempRadius > 10 / mapState.scale) {
       const pts = []; const numPts = 32;
       for(let i=0; i<numPts; i++) { const a = (i/numPts) * Math.PI * 2; pts.push({ x: mapState.circleCenter.x + mapState.tempRadius * Math.cos(a), y: mapState.circleCenter.y + mapState.tempRadius * Math.sin(a) }); }
-      const nId = Date.now().toString(); zones.push({ id: nId, name: "Sector Circular", points: pts, config: { dias: [], hora: "06:00", duracion: "15", color: "#00D4FF" } });
-      guardarTodoDB(); seleccionarPanel('zone', nId);
+      const valvula = getFirstAvailableValve();
+      if (!valvula) {
+        mostrarToast("Las 8 electroválvulas ya tienen un sector asignado.");
+      } else {
+        const hw = getHardwareValvula(valvula);
+        const nId = Date.now().toString();
+        zones.push({
+          id: nId,
+          name: `Sector ${valvula}`,
+          points: pts,
+          config: {
+            dias: [], hora: "06:00", duracion: "15", color: "#00D4FF",
+            valvula, rele: hw.rele, gpio: hw.gpio, sector: valvula - 1, aspersores: 0
+          }
+        });
+        guardarTodoDB();
+        seleccionarPanel('zone', nId);
+      }
     }
     mapState.circleCenter = null; mapState.tempRadius = 0; setMode('pan');
   }
@@ -796,6 +935,11 @@ function seleccionarPanel(type, id) {
   abrirPanelLateral(type);
   if (type === 'zone') {
     const z = zones.find(x => x.id === id); if(!z) return;
+    const zIndex = zones.findIndex(x => x.id === id);
+    const zValve = getZoneValve(z, zIndex) || getFirstAvailableValve(id) || 1;
+    document.getElementById('z-name').value = z.name || `Sector ${zValve}`;
+    document.getElementById('z-aspersores').value = getZoneSprinklers(z);
+    populateValveSelector(zValve, id);
     document.getElementById('z-hora').value = z.config?.hora || "06:00"; 
     document.getElementById('z-dur').value = z.config?.duracion || "15"; 
     document.getElementById('z-color').value = z.config?.color || "#00D4FF";
@@ -843,17 +987,24 @@ async function usarCuentagotas(inputId) {
 function guardarZona() { 
   const z = zones.find(x => x.id === selectedItem.id); 
   if(!z) return; 
-  
+
+  const nombre = document.getElementById('z-name').value.trim();
+  const valvula = parseInt(document.getElementById('z-valvula').value, 10);
+  const aspersores = parseInt(document.getElementById('z-aspersores').value, 10);
   const hora = document.getElementById('z-hora').value; 
   const duracion = document.getElementById('z-dur').value; 
   const color = document.getElementById('z-color').value; 
   const dias = []; 
   document.querySelectorAll('.day-btn.active').forEach(btn => dias.push(btn.getAttribute('data-day'))); 
 
-  if(!hora || !duracion) {
-    mostrarToast("Ingrese hora y duración válidas.");
-    return;
-  }
+  if (!nombre) return mostrarToast("Asigna un nombre al sector.");
+  if (!Number.isInteger(valvula) || valvula < 1 || valvula > 8) return mostrarToast("Selecciona una electroválvula válida.");
+  if (!Number.isInteger(aspersores) || aspersores < 0 || aspersores > 99) return mostrarToast("Ingresa una cantidad de aspersores válida.");
+
+  const valvulaEnUso = zones.some((other, idx) => other.id !== z.id && getZoneValve(other, idx) === valvula);
+  if (valvulaEnUso) return mostrarToast(`La electroválvula ${valvula} ya está asignada a otro sector.`);
+
+  if(!hora || !duracion) return mostrarToast("Ingrese hora y duración válidas.");
 
   const solapadoCon = validarSolapamiento(hora, duracion, dias, z.id);
   if (solapadoCon) {
@@ -861,21 +1012,39 @@ function guardarZona() {
     return;
   }
 
+  const hw = getHardwareValvula(valvula);
+  z.name = nombre;
   if (!z.config) z.config = {};
+  z.config.valvula = valvula;
+  z.config.rele = hw.rele;
+  z.config.gpio = hw.gpio;
+  z.config.sector = valvula - 1;
+  z.config.aspersores = aspersores;
   z.config.hora = hora; 
   z.config.duracion = duracion; 
   z.config.color = color; 
   z.config.dias = dias; 
 
   guardarTodoDB(); 
+  actualizarSelectorSectoresManual();
+  renderEstadoEnVivo();
   renderSVG(); 
   cerrarPanelLateral(); 
-  mostrarToast("¡Sector actualizado correctamente!");
+  mostrarToast(`${nombre} · Válvula ${valvula} guardado`);
 }
 
 function guardarMarcador() { const m = markers.find(x => x.id === selectedItem.id); if(!m) return; m.name = document.getElementById('m-name').value; m.iconType = document.getElementById('m-icon').value; m.color = document.getElementById('m-color').value; m.scale = parseFloat(document.getElementById('m-scale').value); guardarTodoDB(); renderSVG(); mostrarToast("Icono Guardado"); cerrarPanelLateral(); }
 function previewMarkerScale() { const m = markers.find(x => x.id === selectedItem.id); if(m) { m.scale = parseFloat(document.getElementById('m-scale').value); renderSVG(); } }
-function eliminarItem(type) { if(confirm('¿Eliminar este elemento permanentemente?')) { if(type === 'zone') zones = zones.filter(x => x.id !== selectedItem.id); else markers = markers.filter(x => x.id !== selectedItem.id); guardarTodoDB(); cerrarPanelLateral(); } }
+function eliminarItem(type) {
+  if(confirm('¿Eliminar este elemento permanentemente?')) {
+    if(type === 'zone') zones = zones.filter(x => x.id !== selectedItem.id);
+    else markers = markers.filter(x => x.id !== selectedItem.id);
+    guardarTodoDB();
+    actualizarSelectorSectoresManual();
+    renderEstadoEnVivo();
+    cerrarPanelLateral();
+  }
+}
 
 function enviarComando(accion) {
   return db.ref('modulo_riego/comando').set({
@@ -893,43 +1062,79 @@ function enviarRiegoManual() {
   const sector = parseInt(document.getElementById('man-sector').value, 10);
   const minutos = parseInt(document.getElementById('man-minutos').value, 10);
 
-  if (!Number.isInteger(sector) || sector < 0 || sector >= 8) {
-    mostrarToast("Seleccione un sector válido.");
-    return;
-  }
-  if (!Number.isInteger(minutos) || minutos < 1 || minutos > 120) {
-    mostrarToast("La duración debe ser entre 1 y 120 minutos.");
-    return;
-  }
+  if (!Number.isInteger(sector) || sector < 0 || sector >= 8) return mostrarToast("Selecciona un sector configurado.");
+  if (!Number.isInteger(minutos) || minutos < 1 || minutos > 120) return mostrarToast("La duración debe ser entre 1 y 120 minutos.");
 
+  const match = findZoneByHardwareSector(sector);
+  if (!match?.zone) return mostrarToast("Esa electroválvula no tiene un sector asignado.");
+
+  const nombre = match.zone.name || `Sector ${sector + 1}`;
   db.ref('modulo_riego/comando').set({
     accion: "manual",
     sector: sector,
     minutos: minutos,
     timestamp: firebase.database.ServerValue.TIMESTAMP
   }).then(() => {
-    mostrarToast(`Riego manual enviado: Sector ${sector + 1} · ${minutos} min`);
+    mostrarToast(`${nombre} · Válvula ${sector + 1} · ${minutos} min`);
   }).catch((err) => {
     console.error(err);
     mostrarToast("Error al iniciar riego manual");
   });
 }
 
+function actualizarDetalleSectorManual() {
+  const select = document.getElementById('man-sector');
+  const detail = document.getElementById('man-sector-detail');
+  if (!select || !detail) return;
+
+  const sector = parseInt(select.value, 10);
+  const match = Number.isInteger(sector) ? findZoneByHardwareSector(sector) : null;
+  if (!match?.zone) {
+    detail.textContent = "Selecciona un sector configurado.";
+    return;
+  }
+
+  const aspersores = getZoneSprinklers(match.zone);
+  const hw = getHardwareValvula(sector + 1);
+  detail.textContent = `Electroválvula ${sector + 1} · IN${hw.in} / Relé ${hw.rele} · GPIO ${hw.gpio} · ${aspersores} aspersor${aspersores === 1 ? '' : 'es'}`;
+}
+
 function actualizarSelectorSectoresManual() {
   const select = document.getElementById('man-sector');
+  const btn = document.getElementById('btn-manual-start');
+  if (!select) return;
+
+  const previous = select.value;
   select.innerHTML = '';
-  zones.forEach((z, index) => {
+
+  const configured = zones
+    .map((z, index) => ({ z, index, valvula: getZoneValve(z, index) }))
+    .filter(item => Number.isInteger(item.valvula) && item.valvula >= 1 && item.valvula <= 8)
+    .sort((a, b) => a.valvula - b.valvula);
+
+  configured.forEach(({ z, valvula }) => {
     const opt = document.createElement('option');
-    opt.value = index; 
-    opt.textContent = `${z.name || 'Sector'} (Relé ${index + 1})`;
+    opt.value = valvula - 1;
+    const aspersores = getZoneSprinklers(z);
+    opt.textContent = `${z.name || `Sector ${valvula}`} · Válvula ${valvula} · ${aspersores} asp.`;
     select.appendChild(opt);
   });
-  if(zones.length === 0) {
+
+  if (configured.length === 0) {
     const opt = document.createElement('option');
-    opt.value = 0;
-    opt.textContent = "Relé 1 (Por defecto)";
+    opt.value = '';
+    opt.textContent = "No hay sectores configurados";
+    opt.disabled = true;
+    opt.selected = true;
     select.appendChild(opt);
+    if (btn) btn.disabled = true;
+  } else {
+    if ([...select.options].some(o => o.value === previous)) select.value = previous;
+    if (btn) btn.disabled = false;
   }
+
+  select.onchange = actualizarDetalleSectorManual;
+  actualizarDetalleSectorManual();
 }
 </script>
 </body>
