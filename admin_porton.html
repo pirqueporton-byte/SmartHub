@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<title>Smart Hub - Portón</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #F5F7FA; --surface: #FFFFFF; --border: #E4E7EB; --text-main: #111827; --text-muted: #6B7280; --primary: #0F172A; --shadow: 0 10px 30px -10px rgba(0,0,0,0.1); --danger: #D93025; --success: #1E8E3E; --cyan-glow: #00D4FF; }
+  [data-theme="dark"] { --bg: #121418; --surface: #1E2128; --border: #2C303A; --text-main: #F3F4F6; --text-muted: #9CA3AF; --primary: #F8FAFC; --shadow: 0 10px 30px -10px rgba(0,0,0,0.6); --cyan-glow: #A0E0FF;}
+  [data-theme="grey"] { --bg: #202124; --surface: #292A2D; --border: #3C4043; --text-main: #E8EAED; --text-muted: #9AA0A6; --primary: #8AB4F8; --shadow: 0 10px 30px -10px rgba(0,0,0,0.5); --cyan-glow: #78D9EC;}
+  
+  * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; text-decoration: none; }
+  body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text-main); display: flex; transition: 0.3s; overflow-x: hidden; }
+
+  /* SIDEBAR INTACTO */
+  .dash-sidebar { width: 80px; background: var(--bg); display: flex; flex-direction: column; align-items: center; padding-top: 24px; z-index: 50; border-right: 1px solid var(--border); transition: 0.3s;}
+  .dash-logo-icon { width: 44px; height: 44px; background: var(--surface); border-radius: 14px; display: flex; align-items: center; justify-content: center; color: var(--text-main); margin-bottom: 30px; box-shadow: var(--shadow); border: 1px solid var(--border); transition: 0.3s;}
+  .dash-nav-item { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: transparent; border-radius: 12px; color: var(--text-muted); cursor: pointer; margin-bottom: 12px; transition: 0.2s; border: 1px solid transparent; }
+  .dash-nav-item.active { background: var(--surface); color: var(--text-main); box-shadow: var(--shadow); border: 1px solid var(--border); }
+  .dash-nav-item:hover:not(.active) { color: var(--text-main); }
+  .dash-nav-item svg { width: 20px; height: 20px; }
+  
+  .dash-footer { padding: 12px; border-top: 1px solid var(--border); width: 100%; margin-top: auto; display: flex; justify-content: center; transition: 0.3s;}
+
+  /* CONTENIDO PRINCIPAL */
+  .dash-content { flex: 1; display: flex; flex-direction: column; padding: 32px 40px; overflow: hidden; }
+  .header-bar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-shrink: 0; }
+  .dash-title { font-size: 28px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.5px; }
+  .dash-subtitle { font-size: 14px; color: var(--text-muted); margin: 0; }
+
+  .header-actions { display: flex; gap: 12px; align-items: center; }
+  .btn-icon { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--text-main); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; }
+  .btn-icon:hover { background: var(--border); }
+
+  /* CENTRO DEL ESCENARIO (BOTÓN MINIMALISTA) */
+  .center-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-bottom: 40px; }
+  
+  .gate-btn-wrap { position: relative; width: 220px; height: 220px; margin-bottom: 30px; }
+  .gate-btn { 
+    width: 100%; height: 100%; border-radius: 50%; border: 3px solid var(--cyan-glow); 
+    background: var(--surface); color: var(--cyan-glow); cursor: pointer; 
+    box-shadow: 0 0 30px rgba(0,212,255,0.1), inset 0 0 20px rgba(0,212,255,0.05); 
+    transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); display: flex; align-items: center; justify-content: center; 
+  }
+  .gate-btn svg { width: 60px; height: 60px; transition: 0.3s; }
+  
+  .gate-btn:hover:not(:disabled) { box-shadow: 0 0 50px rgba(0,212,255,0.3), inset 0 0 30px rgba(0,212,255,0.1); transform: scale(1.02); }
+  .gate-btn:active:not(:disabled) { transform: scale(0.92); box-shadow: 0 0 15px rgba(0,212,255,0.4); }
+  
+  .gate-btn:disabled { border-color: var(--border); color: var(--border); box-shadow: none; cursor: not-allowed; }
+
+  /* Animación de Onda (Pulse) al hacer clic */
+  .pulse-anim { animation: pulse-ring 0.8s cubic-bezier(0.215, 0.61, 0.355, 1) forwards; }
+  @keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 rgba(0,212,255, 0.5); }
+    100% { box-shadow: 0 0 0 60px rgba(0,212,255, 0); }
+  }
+
+  /* ESTADO DE CONEXIÓN */
+  .status-container { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--text-muted); background: var(--surface); padding: 10px 20px; border-radius: 99px; border: 1px solid var(--border); box-shadow: var(--shadow); }
+  .status-dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
+
+  /* MODAL DE AJUSTES (CONTENEDOR DE TARJETAS) */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 9999; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: 0.3s; }
+  .modal-backdrop.active { opacity: 1; pointer-events: all; }
+  
+  .modal-card-large { background: var(--bg); padding: 32px; border-radius: 24px; width: 95%; max-width: 900px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.4); transform: translateY(20px); transition: 0.3s; border: 1px solid var(--border); }
+  .modal-backdrop.active .modal-card-large { transform: translateY(0); }
+  
+  .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+  .modal-header h2 { margin: 0; font-size: 22px; font-weight: 700; color: var(--text-main); }
+  .btn-close { background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 8px; transition: 0.2s; }
+  .btn-close:hover { color: var(--danger); }
+
+  /* TARJETAS INTERNAS DEL MODAL */
+  .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+  .dash-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: var(--shadow); transition: 0.3s;}
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-weight: 700; font-size: 15px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+  
+  /* LISTAS Y FORMULARIOS */
+  .admin-list { display: flex; flex-direction: column; gap: 8px; }
+  .admin-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: rgba(0,0,0,0.02); border-radius: 8px; font-size: 13px; border: 1px solid var(--border); transition: 0.3s;}
+  [data-theme="dark"] .admin-row, [data-theme="grey"] .admin-row { background: rgba(255,255,255,0.02); }
+  .admin-row strong { color: var(--text-main); display: block; font-size: 13.5px; margin-bottom: 2px; }
+  
+  .btn-outline { background: transparent; border: 1px solid var(--border); padding: 10px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text-main); transition: 0.2s; width: 100%; text-align: center; }
+  .btn-outline:hover { background: rgba(100,100,100,0.1); }
+  .btn-action { width: 32px; height: 32px; border-radius: 8px; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; background: rgba(217, 48, 37, 0.1); color: var(--danger); transition: 0.2s;}
+  .btn-action:hover { background: var(--danger); color: white; }
+  
+  .admin-input { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; font-size: 13px; background: var(--surface); color: var(--text-main); font-weight: 500; outline: none; transition: 0.2s; }
+  .admin-input:focus { border-color: var(--text-muted); }
+
+  .toast { position: fixed; bottom: 30px; left: 50%; transform: translate(-50%, 20px); background: var(--text-main); color: var(--bg); padding: 12px 24px; border-radius: 99px; font-size: 13px; font-weight: 600; opacity: 0; transition: 0.3s; pointer-events: none; z-index: 9999; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (max-width: 850px) {
+    body { flex-direction: column; }
+    .dash-sidebar { width: 100%; height: 70px; flex-direction: row; order: 2; border-right: none; border-top: 1px solid var(--border); justify-content: space-around; padding: 0; }
+    .dash-logo-icon { display: none; }
+    .dash-nav-item { margin: 0; width: 44px; height: 44px; }
+    .dash-footer { padding: 0 12px; border-top: none; border-left: 1px solid var(--border); width: auto; margin-top: 0; align-items: center; }
+    .dash-content { padding: 20px; order: 1; }
+    .modal-card-large { padding: 20px; width: 100%; height: 100%; border-radius: 0; max-height: 100vh; }
+  }
+</style>
+<link rel="stylesheet" href="app.css">
+</head>
+<body data-theme="dark" class="app-shell page-porton">
+
+<!-- SIDEBAR INTACTO -->
+<aside class="dash-sidebar">
+  <div class="dash-logo-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></div>
+  <a href="admin_inicio.html" data-label="Inicio" title="Inicio" class="dash-nav-item"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg></a>
+  <a href="admin_porton.html" data-label="Portón" title="Portón" class="dash-nav-item active"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg></a>
+  <a href="admin_riego.html" data-label="Riego" title="Riego" class="dash-nav-item"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></a>
+  <a href="#" onclick="cerrarSesion()" data-label="Salir" title="Cerrar sesión" class="dash-nav-item" style="color:var(--danger);"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg></a>
+  
+  <div class="dash-footer">
+    <button class="dash-nav-item theme-btn-icon" id="theme-btn-sidebar" data-label="Tema" onclick="ciclarTema()" style="width:100%; margin:0;" title="Cambiar Tema">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </button>
+  </div>
+</aside>
+
+<main class="dash-content">
+  <!-- CABECERA CON BOTÓN DE ENGRANAJE -->
+  <div class="header-bar app-page-header">
+    <div>
+      <h1 class="dash-title">Portón de acceso</h1>
+      <p class="dash-subtitle">Control y estado del acceso principal.</p>
+    </div>
+    <div class="header-actions">
+      <!-- Botón de Engranaje para abrir Configuraciones -->
+      <button class="btn-icon" onclick="document.getElementById('settings-modal').classList.add('active')" title="Ajustes del Portón">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="width:20px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- CENTRO DE ESCENARIO: SOLO EL BOTÓN Y EL ESTADO -->
+  <div class="center-stage">
+    <div class="gate-btn-wrap">
+      <button class="gate-btn gate-action-btn" id="main-gate-btn" onclick="abrirPortonAnimado()" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 15v2"></path><path d="M6 10V7a6 6 0 0 1 11.3-2.8"></path><rect x="5" y="10" width="14" height="11" rx="2"></rect></svg>
+      </button>
+    </div>
+    
+    <div class="status-container">
+      <div class="status-dot conexion-dot"></div>
+      <span class="conexion-text">Conectando…</span>
+    </div>
+  </div>
+</main>
+
+<!-- MODAL DE CONFIGURACIONES (AQUÍ ESTÁN TODAS LAS TARJETAS VIEJAS) -->
+<div id="settings-modal" class="modal-backdrop">
+  <div class="modal-card-large">
+    <div class="modal-header">
+      <h2>Ajustes y Permisos</h2>
+      <button class="btn-close" onclick="document.getElementById('settings-modal').classList.remove('active')">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+
+    <div class="dash-grid">
+      <!-- Cuentas Autorizadas -->
+      <div class="dash-card">
+        <div class="card-header">Cuentas Autorizadas (Web)</div>
+        <div class="admin-list" id="lista-autorizados">Cargando...</div>
+      </div>
+
+      <!-- Historial -->
+      <div class="dash-card">
+        <div class="card-header">Últimas Aperturas</div>
+        <div class="admin-list" id="lista-historial">Cargando...</div>
+      </div>
+
+      <!-- Telegram -->
+      <div class="dash-card">
+        <div class="card-header">Bots de Telegram</div>
+        <div style="display:flex; gap:8px;"><input type="text" id="tg-id" class="admin-input" placeholder="ID Numérico"><input type="text" id="tg-nombre" class="admin-input" placeholder="Nombre"></div>
+        <button class="btn-outline" onclick="agregarTelegram()">Guardar Telegram</button>
+        <div class="admin-list" style="margin-top:16px;" id="lista-telegram"></div>
+      </div>
+
+      <!-- Redes WiFi -->
+      <div class="dash-card">
+        <div class="card-header">Redes WiFi del Motor</div>
+        <div style="display:flex; gap:8px;"><input type="text" id="red-ssid" class="admin-input" placeholder="SSID (Nombre)"><input type="password" id="red-pass" class="admin-input" placeholder="Contraseña"></div>
+        <button class="btn-outline" onclick="agregarRed()">Añadir y Reiniciar Placa</button>
+        <div class="admin-list" style="margin-top:16px;" id="lista-redes"></div>
+      </div>
+
+      <!-- Emparejamiento ESP-NOW -->
+      <div class="dash-card" style="grid-column: 1 / -1;">
+        <div class="card-header">Controles Físicos (Sin WiFi)</div>
+        <p style="font-size:13px; color:var(--text-muted); margin-top:0;">Activa esta opción para vincular un nuevo control remoto ESP-NOW sin usar internet.</p>
+        <button class="btn-outline" onclick="activarEmparejamiento()" style="background:var(--text-main); color:var(--bg); max-width: 300px;">Activar Escaneo (60s)</button>
+        <div class="admin-list" style="margin-top:16px;" id="lista-controles"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast">Mensaje</div>
+
+<!-- FIREBASE E INICIALIZACIÓN -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script src="voz.js"></script>
+<script>
+// Motor de Temas
+function aplicarTema(tema) {
+  if (tema === 'light') document.body.removeAttribute('data-theme');
+  else document.body.setAttribute('data-theme', tema);
+  
+  localStorage.setItem('riegoTheme', tema);
+  
+  const svgLight = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>';
+  const svgGrey = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a10 10 0 0 0 0 20z" fill="currentColor"></path></svg>';
+  const svgDark = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
+  
+  let svgStr = svgDark; let txt = 'Oscuro';
+  if(tema === 'light') { svgStr = svgLight; txt = 'Claro'; }
+  else if(tema === 'grey') { svgStr = svgGrey; txt = 'Gris'; }
+
+  document.querySelectorAll('.theme-btn-icon').forEach(btn => {
+    if(btn.querySelector('span')) btn.innerHTML = `${svgStr} <span>${txt}</span>`;
+    else btn.innerHTML = svgStr;
+  });
+}
+
+function ciclarTema() {
+  const actual = localStorage.getItem('riegoTheme') || 'dark';
+  let nuevo = 'dark';
+  if(actual === 'dark') nuevo = 'grey';
+  else if(actual === 'grey') nuevo = 'light';
+  aplicarTema(nuevo);
+}
+
+aplicarTema(localStorage.getItem('riegoTheme') || 'dark');
+
+// Firebase
+const firebaseConfig = { apiKey: "AIzaSyCABy9Rpn1wc1gYBzDEm8Mf05x0gu9lpyQ", authDomain: "portonpirque.firebaseapp.com", databaseURL: "https://portonpique-default-rtdb.firebaseio.com/", projectId: "portonpirque" };
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth(); const db = firebase.database(); const ADMIN_EMAIL = "pirqueporton@gmail.com"; let currentUser = null;
+
+function mostrarToast(msg) {
+  const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+auth.onAuthStateChanged((user) => {
+    if(!user || user.email !== ADMIN_EMAIL) window.location.href = 'index.html';
+    else { currentUser = user; iniciarDatos(); }
+});
+function cerrarSesion() { auth.signOut().then(() => window.location.href = 'index.html'); }
+
+// LÓGICA DE FIREBASE INTACTA
+function iniciarDatos() {
+  let ultimoLatido = 0; let serverTimeOffset = 0;
+  db.ref('.info/serverTimeOffset').on('value', snap => serverTimeOffset = snap.val() || 0);
+  db.ref('estado_porton/ultima_conexion').on('value', snap => { if(snap.exists()) ultimoLatido = snap.val(); });
+  setInterval(() => {
+    const dif = ((Date.now() + serverTimeOffset) - ultimoLatido) / 1000;
+    const isOnline = dif <= 30;
+    document.querySelector('.conexion-text').textContent = isOnline ? 'En línea' : 'Sin conexión';
+    document.querySelector('.conexion-dot').style.color = isOnline ? 'var(--success)' : 'var(--danger)';
+    document.querySelectorAll('.gate-action-btn').forEach(b => b.disabled = !isOnline);
+  }, 1000);
+
+  db.ref('historial').limitToLast(6).on('value', snap => {
+    let html = ''; snap.forEach(c => { html = `<div class="admin-row"><div><strong>${c.val().usuario}</strong></div> <span style="color:var(--text-muted)">${c.val().fecha}</span></div>` + html; });
+    document.getElementById('lista-historial').innerHTML = html || '<div class="admin-row">Sin registros</div>';
+  });
+  
+  db.ref('telegram_usuarios').on('value', snap => { const d = snap.val(); document.getElementById('lista-telegram').innerHTML = d ? Object.keys(d).map(k => `<div class="admin-row"><div><strong>${d[k].nombre}</strong><span style="color:var(--text-muted)">${k}</span></div> <button class="btn-action" onclick="db.ref('telegram_usuarios/${k}').remove()"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></div>`).join('') : ''; });
+  db.ref('configuracion/redes_wifi').on('value', snap => { const d = snap.val(); document.getElementById('lista-redes').innerHTML = d ? Object.keys(d).map(k => `<div class="admin-row"><strong>${d[k].ssid}</strong> <button class="btn-action" onclick="db.ref('configuracion/redes_wifi/${k}').remove()"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></div>`).join('') : ''; });
+  db.ref('config_espnow').on('value', snap => { const d = snap.val(); document.getElementById('lista-controles').innerHTML = d ? Object.keys(d).map(k => `<div class="admin-row"><div><strong>${d[k].nombre}</strong><span style="color:var(--text-muted)">${d[k].mac}</span></div></div>`).join('') : '<div class="admin-row">Sin controles vinculados</div>'; });
+  db.ref('lista_blanca').on('value', snap => { const d = snap.val(); document.getElementById('lista-autorizados').innerHTML = d ? Object.keys(d).map(k => `<div class="admin-row"><div><strong>${d[k].nombre}</strong><span style="color:var(--text-muted)">${d[k].correo}</span></div> <button class="btn-action" onclick="db.ref('lista_blanca/${k}').remove()"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></div>`).join('') : ''; });
+}
+
+// Nueva función que emite la animación al abrir
+function abrirPortonAnimado() {
+  const btn = document.getElementById('main-gate-btn');
+  
+  // Agregamos la clase que dispara el CSS keyframe de pulso
+  btn.classList.add('pulse-anim');
+  setTimeout(() => btn.classList.remove('pulse-anim'), 800); // limpiamos para la próxima vez
+
+  document.querySelector('.conexion-text').textContent = 'Transmitiendo orden...';
+  
+  db.ref('estado_porton').update({ comando: 'abrir_' + Date.now(), timestamp: firebase.database.ServerValue.TIMESTAMP }).then(() => { 
+    mostrarToast('Orden de apertura enviada'); 
+    db.ref('historial').push({ fecha: new Date().toLocaleString('es-CL'), usuario: currentUser.displayName }); 
+  });
+}
+
+function agregarTelegram() { const id = document.getElementById('tg-id').value; const n = document.getElementById('tg-nombre').value; if(id&&n) { db.ref(`telegram_usuarios/${id}`).set({ nombre: n }); document.getElementById('tg-id').value=''; document.getElementById('tg-nombre').value=''; } }
+function agregarRed() { const s = document.getElementById('red-ssid').value; const p = document.getElementById('red-pass').value; if(s) { db.ref('configuracion/redes_wifi').push({ ssid: s, pass: p }); mostrarToast('Red guardada'); } }
+function activarEmparejamiento() { db.ref('estado_porton').update({ comando: 'emparejar', timestamp: firebase.database.ServerValue.TIMESTAMP }); mostrarToast('Emparejamiento activado'); }
+</script>
+</body>
+</html>

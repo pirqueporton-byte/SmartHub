@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<title>Smart Hub - Riego</title>
+
+<!-- CONFIGURACIÓN PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1F4A32">
+<link rel="apple-touch-icon" href="icon-192.png">
+
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { 
+    --bg: #F5F7FA; --surface: #FFFFFF; --border: #E4E7EB; --text-main: #111827; 
+    --text-muted: #6B7280; --primary: #0F172A; --primary-text: #FFFFFF;
+    --cyan-glow: #00D4FF; --shadow: 0 10px 30px -10px rgba(0,0,0,0.1); --map-bg: #1F2937; --danger: #D93025;
+    --success: #10B981; --warning: #F59E0B;
+  }
+  [data-theme="dark"] { 
+    --bg: #121418; --surface: #1E2128; --border: #2C303A; --text-main: #F3F4F6; 
+    --text-muted: #9CA3AF; --primary: #F8FAFC; --primary-text: #0F172A;
+    --cyan-glow: #A0E0FF; --shadow: 0 10px 30px -10px rgba(0,0,0,0.6); --map-bg: #0A0C10; 
+  }
+  [data-theme="grey"] { 
+    --bg: #202124; --surface: #292A2D; --border: #3C4043; --text-main: #E8EAED; 
+    --text-muted: #9AA0A6; --primary: #8AB4F8; --primary-text: #202124;
+    --cyan-glow: #78D9EC; --shadow: 0 10px 30px -10px rgba(0,0,0,0.5); --map-bg: #17181A; --danger: #F28B82;
+  }
+
+  * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
+  
+  /* CORRECCIÓN ESTRUCTURAL 1: Se fija el body al tamaño exacto de la pantalla dinámica */
+  body { margin: 0; height: 100dvh; width: 100vw; background: var(--bg); color: var(--text-main); overflow: hidden; display: flex; transition: 0.3s; }
+
+  /* SIDEBAR MINIMALISTA */
+  .dash-sidebar { width: 80px; background: var(--bg); display: flex; flex-direction: column; align-items: center; padding-top: 24px; z-index: 50; border-right: 1px solid var(--border); transition: 0.3s; flex-shrink: 0;}
+  .dash-logo-icon { width: 44px; height: 44px; background: var(--surface); border-radius: 14px; display: flex; align-items: center; justify-content: center; color: var(--text-main); margin-bottom: 30px; box-shadow: var(--shadow); border: 1px solid var(--border); transition: 0.3s;}
+  .dash-nav-item { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; border-radius: 12px; color: var(--text-muted); cursor: pointer; margin-bottom: 12px; transition: 0.2s; text-decoration: none; }
+  .dash-nav-item.active { background: var(--surface); color: var(--text-main); box-shadow: var(--shadow); border: 1px solid var(--border); }
+  .dash-nav-item:hover:not(.active) { color: var(--text-main); }
+  .dash-nav-item svg { width: 20px; height: 20px; }
+  .dash-footer { padding: 12px; border-top: 1px solid var(--border); width: 100%; margin-top: auto; display: flex; justify-content: center; transition: 0.3s;}
+
+  /* CONTENIDO PRINCIPAL */
+  /* CORRECCIÓN ESTRUCTURAL 2: min-height: 0 estricto para evitar el desbordamiento de Flexbox */
+  .dash-content { flex: 1; padding: 24px 32px; display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
+  
+  .riego-header-bar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-shrink: 0; }
+  .dash-title { font-size: 26px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.5px; }
+  .dash-subtitle { font-size: 13px; color: var(--text-muted); margin: 0; display: flex; align-items: center; gap: 8px; }
+  
+  .status-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: rgba(107, 114, 128, 0.1); color: var(--text-muted); }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); transition: 0.3s; }
+  .status-badge.online { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+  .status-badge.online .status-dot { background: var(--success); box-shadow: 0 0 8px var(--success); }
+  .status-badge.offline { background: rgba(217, 48, 37, 0.1); color: var(--danger); }
+  .status-badge.offline .status-dot { background: var(--danger); }
+
+  .header-actions { display: flex; gap: 12px; align-items: center; }
+  .btn-icon { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--text-main); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; flex-shrink:0;}
+  .btn-icon:hover { background: var(--border); }
+  .btn-theme { background: var(--surface); color: var(--text-main); border: 1px solid var(--border); padding: 0 16px; height: 40px; border-radius: 99px; font-weight: 600; cursor: pointer; font-size: 13px; transition: 0.2s; display: flex; align-items: center; gap: 8px; box-shadow: var(--shadow); flex-shrink:0;}
+  .btn-primary { background: var(--primary); color: var(--primary-text); border: none; padding: 0 20px; height: 40px; border-radius: 99px; font-weight: 700; cursor: pointer; font-size: 13px; transition: 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.1); flex-shrink:0;}
+
+  /* LAYOUT DINÁMICO */
+  /* CORRECCIÓN ESTRUCTURAL 3: min-height: 0 estricto en la capa media */
+  .riego-layout { flex: 1; display: flex; gap: 0; transition: gap 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); min-height: 0; min-width: 0; position: relative; }
+  .riego-layout.panel-open { gap: 24px; }
+
+  /* MAPA RECTANGULAR */
+  /* CORRECCIÓN ESTRUCTURAL 4: min-height: 0 estricto para forzar a que acate los bordes */
+  .riego-map-wrapper { flex: 1; min-height: 0; min-width: 0; background: var(--map-bg); border-radius: 20px; position: relative; overflow: hidden; border: 1px solid var(--border); box-shadow: inset 0 0 50px rgba(0,0,0,0.6), var(--shadow); touch-action: none; transition: filter 0.4s ease, border-radius 0.4s ease; }
+  .riego-map-wrapper.view-minimal { background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px); background-size: 24px 24px; }
+  
+  .ambient-bg { position: absolute; top: -10%; left: -10%; width: 120%; height: 120%; background-size: cover; background-position: center; filter: blur(40px); opacity: 0; transition: opacity 0.6s ease; pointer-events: none; z-index: 0; }
+  #map-transform { position: absolute; top: 0; left: 0; transform-origin: 0 0; cursor: grab; z-index: 1; }
+  #map-transform.drawing { cursor: crosshair; }
+  
+  #map-image { 
+    display: block; width: 100%; height: 100%; opacity: 1; pointer-events: none; transition: 0.4s; 
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 16px, black calc(100% - 16px), transparent 100%), 
+                        linear-gradient(to bottom, transparent 0%, black 16px, black calc(100% - 16px), transparent 100%); 
+    -webkit-mask-composite: source-in; 
+  }
+  
+  #map-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+  .zone-poly { transition: 0.2s; pointer-events: all; } 
+  .zone-poly.selected { stroke-width: 2.5px !important; filter: drop-shadow(0 0 12px rgba(255,255,255,0.4)); }
+  .draw-line { stroke: var(--cyan-glow); stroke-width: 2px; stroke-dasharray: 6 4; pointer-events: none; }
+  .draw-point { fill: #fff; stroke: var(--cyan-glow); stroke-width: 2px; pointer-events: none; }
+  .snap-point { fill: #FFD700; r: 6; filter: drop-shadow(0 0 4px #FFD700); pointer-events: none; }
+  .marker-group { transition: transform 0.1s linear; pointer-events: all; }
+  .marker-group.selected circle.icon-bg { stroke: #FFF; stroke-width: 3px; filter: drop-shadow(0 0 8px rgba(255,255,255,0.6)); }
+
+  /* BOTONES FLOTANTES EN EL MAPA */
+  .floating-tools-container { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 10; transition: 0.3s; }
+  .floating-tools-btn { background: var(--surface); color: var(--text-main); border: 1px solid var(--border); padding: 12px 24px; border-radius: 99px; font-weight: 700; font-size: 13px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); cursor: pointer; transition: 0.3s; display: flex; align-items: center; gap: 8px; }
+  .floating-tools-btn:hover { background: var(--bg); transform: scale(1.05); }
+  .riego-layout.panel-open .floating-tools-container { opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(20px); }
+
+  /* PANEL LATERAL DINÁMICO */
+  .side-panel { width: 0; opacity: 0; overflow: hidden; background: var(--surface); border-radius: 20px; transition: 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); display: flex; flex-direction: column; flex-shrink: 0; border: 1px solid transparent; box-shadow: none; position: relative; }
+  .riego-layout.panel-open .side-panel { width: 360px; opacity: 1; border-color: var(--border); box-shadow: var(--shadow); }
+  .side-panel-content { padding: 24px; width: 360px; height: 100%; overflow-y: auto; display: flex; flex-direction: column; }
+  
+  .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+  .panel-title { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+  .btn-close { background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; border-radius: 50%; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+  .btn-close:hover { background: var(--bg); color: var(--danger); }
+
+  /* HERRAMIENTAS Y FORMULARIOS */
+  .tools-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 24px; }
+  .tool-btn { background: var(--bg); border: 1px solid var(--border); padding: 12px; border-radius: 12px; font-weight: 600; font-size: 13px; color: var(--text-muted); cursor: pointer; transition: 0.2s; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .tool-btn svg { width: 20px; height: 20px; }
+  .tool-btn.active { background: var(--text-main); color: var(--bg); border-color: var(--text-main); box-shadow: var(--shadow); }
+  .tool-btn:hover:not(.active) { border-color: var(--text-muted); }
+
+  .view-controls { display: flex; background: var(--bg); padding: 4px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 24px; }
+  .view-btn { flex: 1; background: transparent; border: none; padding: 8px; border-radius: 8px; font-weight: 600; font-size: 12.5px; color: var(--text-muted); cursor: pointer; transition: 0.2s; }
+  .view-btn.active { background: var(--surface); color: var(--text-main); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+  .zoom-controls { display: flex; gap: 10px; justify-content: center; margin-top: auto; padding-top: 24px; border-top: 1px solid var(--border); }
+  .zoom-btn { width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--text-main); display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; transition: 0.2s; }
+  .zoom-btn:hover { background: var(--surface); border-color: var(--text-muted); }
+
+  .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+  .form-group label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .form-input { padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text-main); font-size: 14px; outline: none; font-weight: 500; transition: 0.2s; width: 100%; }
+  .form-input:focus { border-color: var(--text-muted); }
+  
+  .days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .day-btn { padding: 10px 0; text-align: center; border: 1px solid var(--border); background: transparent; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 700; color: var(--text-muted); transition: 0.2s; }
+  .day-btn.active { background: var(--primary); color: var(--primary-text); border-color: var(--primary); }
+  
+  .btn-outline { background: transparent; border: 1px solid var(--border); padding: 12px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text-main); transition: 0.2s; width: 100%; }
+  .btn-outline:hover { background: rgba(100,100,100,0.1); }
+  .btn-danger { color: var(--danger); border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05); }
+  .btn-warning { color: var(--warning); border-color: rgba(245, 158, 11, 0.3); background: rgba(245, 158, 11, 0.05); }
+
+  .live-status-card { background: var(--bg); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 8px; }
+  .live-status-title { font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); display: flex; align-items: center; justify-content: space-between; }
+  .live-status-value { font-size: 15px; font-weight: 700; color: var(--text-main); }
+  .live-timer { font-size: 22px; font-weight: 800; color: var(--cyan-glow); font-family: monospace; }
+
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 9999; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: 0.3s; }
+  .modal-backdrop.active { opacity: 1; pointer-events: all; }
+  .modal-card { background: var(--surface); padding: 32px; border-radius: 24px; width: 90%; max-width: 400px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); transform: translateY(20px); transition: 0.3s; border: 1px solid var(--border); }
+  .modal-backdrop.active .modal-card { transform: translateY(0); }
+  input[type=range] { width: 100%; -webkit-appearance: none; background: transparent; margin: 10px 0; }
+  input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; background: var(--border); border-radius: 3px; cursor: pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--text-main); cursor: pointer; margin-top: -6px; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+
+  /* ==========================================================
+     VERSIÓN PREMIUM CELULAR (CORRECCIÓN FLEXBOX)
+     ========================================================== */
+  @media (max-width: 850px) {
+    body { flex-direction: column; height: 100dvh; width: 100vw; overflow: hidden; margin: 0; }
+    
+    .dash-sidebar { 
+      position: fixed; bottom: 0; left: 0; width: 100%; height: 70px; flex-direction: row; order: unset; 
+      border-right: none; border-top: 1px solid var(--border); justify-content: space-around; padding: 0; z-index: 2500; background: var(--bg);
+    }
+    .dash-logo-icon { display: none; }
+    .dash-nav-item { margin: 0; width: 44px; height: 44px; }
+    .dash-footer { padding: 0 12px; border-top: none; border-left: 1px solid var(--border); width: auto; margin-top: 0; align-items: center; }
+    
+    /* El espacio exacto sobrante se asigna aquí para que el mapa NUNCA se salga */
+    .dash-content { 
+      flex: 1; padding: 16px; padding-bottom: 86px; min-height: 0; display: flex; flex-direction: column; overflow: hidden; order: unset; 
+    }
+    .riego-header-bar { flex-direction: column; gap: 12px; align-items: flex-start; margin-bottom: 16px; flex-shrink: 0; }
+    .header-actions { width: 100%; display: flex; justify-content: space-between; flex-wrap: wrap; }
+    .btn-theme span { display: none; } 
+    .dash-title { font-size: 22px; }
+    
+    .riego-layout { flex: 1; flex-direction: column; gap: 0 !important; min-height: 0; position: relative; }
+    
+    .riego-map-wrapper { 
+      flex: 1; min-height: 0; width: 100%; border-radius: 16px; transition: filter 0.4s ease;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.6), var(--shadow); /* Sombra suavizada para celular */
+    }
+    
+    .riego-layout.panel-open .riego-map-wrapper { 
+      filter: brightness(0.3) blur(4px); pointer-events: auto;
+    }
+    
+    .floating-tools-container { width: 95%; bottom: 16px; gap: 8px; z-index: 10; }
+    .floating-tools-btn { flex: 1; justify-content: center; padding: 10px 8px; font-size: 11px; text-align: center; }
+    
+    /* PANEL TIPO BOTTOM SHEET */
+    .side-panel { 
+      position: fixed !important; bottom: 70px; left: 0; width: 100% !important; max-height: calc(100dvh - 120px); 
+      border-radius: 24px 24px 0 0; background: var(--surface); z-index: 3000 !important; 
+      transform: translateY(120vh) !important; display: flex !important; opacity: 1 !important; transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); 
+      border: none; box-shadow: 0 -10px 40px rgba(0,0,0,0.5); 
+    }
+    
+    .side-panel::before { 
+      content: ''; position: absolute; top: 12px; left: 50%; transform: translateX(-50%); 
+      width: 40px; height: 5px; background: var(--border); border-radius: 10px; z-index: 10; 
+    }
+    
+    .riego-layout.panel-open .side-panel { transform: translateY(0) !important; }
+    .side-panel-content { width: 100%; padding: 24px 20px; padding-top: 32px; overflow-y: auto; }
+    
+    .days-grid { gap: 4px; }
+    .day-btn { padding: 8px 0; font-size: 11px; }
+  }
+  
+  .toast { position: fixed; bottom: 30px; left: 50%; transform: translate(-50%, 20px); background: var(--text-main); color: var(--bg); padding: 12px 24px; border-radius: 99px; font-size: 13px; font-weight: 600; opacity: 0; transition: 0.3s; pointer-events: none; z-index: 9999; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+</style>
+<link rel="stylesheet" href="app.css">
+</head>
+<body data-theme="dark" class="app-shell page-riego">
+
+<aside class="dash-sidebar">
+  <div class="dash-logo-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></div>
+  <a href="admin_inicio.html" data-label="Inicio" title="Inicio" class="dash-nav-item"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg></a>
+  <a href="admin_porton.html" data-label="Portón" title="Portón" class="dash-nav-item"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg></a>
+  <a href="admin_riego.html" data-label="Riego" title="Riego" class="dash-nav-item active"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></a>
+  <a href="#" onclick="cerrarSesion()" data-label="Salir" title="Cerrar sesión" class="dash-nav-item" style="color:#D93025;"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg></a>
+  <div class="dash-footer">
+    <button class="dash-nav-item theme-btn-icon" id="theme-btn-sidebar" data-label="Tema" onclick="ciclarTema()" style="width:100%; margin:0;" title="Cambiar Tema">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </button>
+  </div>
+</aside>
+
+<main class="dash-content">
+  <div class="riego-header-bar app-page-header">
+    <div>
+      <h1 class="dash-title">Riego</h1>
+      <p class="dash-subtitle">
+        Programación y control de los sectores. 
+        <span id="esp-status-badge" class="status-badge offline">
+          <span class="status-dot"></span> <span id="esp-status-text">Sin conexión</span>
+        </span>
+      </p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-theme theme-btn-icon" onclick="ciclarTema()" id="theme-btn">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="width:16px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg> 
+        <span>Oscuro</span>
+      </button>
+      <button class="btn-icon" onclick="document.getElementById('visual-modal').classList.add('active')" title="Ajustes Visuales">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="width:18px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0l2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      </button>
+      <button class="btn-primary" onclick="document.getElementById('map-upload').click()">Actualizar Plano</button>
+      <input type="file" id="map-upload" hidden accept="image/*" onchange="procesarYComprimirImagen(event)">
+    </div>
+  </div>
+
+  <div class="riego-layout" id="main-layout">
+    
+    <!-- EL MAPA RECTANGULAR PRINCIPAL -->
+    <div class="riego-map-wrapper" id="map-wrapper">
+      <div id="map-ambient-bg" class="ambient-bg"></div>
+      <div id="map-transform">
+        <img id="map-image" src="" style="display:none;">
+        <svg id="map-svg"></svg>
+      </div>
+      <!-- BOTONES FLOTANTES EN EL MAPA -->
+      <div class="floating-tools-container">
+        <button class="floating-tools-btn" onclick="abrirPanelLateral('tools')">✏️ Editar Mapa</button>
+        <button class="floating-tools-btn" style="background: var(--primary); color: var(--primary-text);" onclick="abrirPanelLateral('control-manual')">⚡ Control Manual</button>
+      </div>
+    </div>
+
+    <!-- PANEL LATERAL DESLIZABLE -->
+    <aside class="side-panel" id="side-panel">
+      <div class="side-panel-content">
+        
+        <!-- HEADER DEL PANEL -->
+        <div class="panel-header">
+          <h2 class="panel-title" id="side-panel-title">Edición</h2>
+          <button class="btn-close" onclick="cerrarPanelLateral()">
+            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+
+        <!-- CONTENIDO 1: HERRAMIENTAS DE MAPA -->
+        <div id="panel-tools" style="display:none; height:100%; flex-direction:column;">
+          <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom:10px;">Estilo de Vista</label>
+          <div class="view-controls">
+            <button class="view-btn active" id="btn-view-map" onclick="setView('map')">Realista</button>
+            <button class="view-btn" id="btn-view-minimal" onclick="setView('minimal')">Geométrico</button>
+          </div>
+
+          <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom:10px;">Herramientas</label>
+          <div class="tools-grid">
+            <button class="tool-btn active" id="btn-mode-pan" onclick="setMode('pan')">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+              Mover
+            </button>
+            <button class="tool-btn" id="btn-mode-perimeter" onclick="setMode('perimeter')">📐 Perímetro</button>
+            <button class="tool-btn" id="btn-mode-zone" onclick="setMode('zone')">⬟ Polígono</button>
+            <button class="tool-btn" id="btn-mode-circle" onclick="setMode('circle')">⭕ Circular</button>
+            <button class="tool-btn" id="btn-mode-marker" style="grid-column: 1 / -1;" onclick="setMode('marker')">📍 Añadir Icono</button>
+          </div>
+
+          <div class="zoom-controls">
+            <button class="zoom-btn" onclick="zoomMap(-0.2)">-</button>
+            <button class="zoom-btn" onclick="zoomMap(0.2)">+</button>
+          </div>
+        </div>
+
+        <!-- CONTENIDO 2: FORMULARIO ZONA -->
+        <div id="panel-zone" style="display:none;">
+          <div class="form-group"><label>Días Activos</label>
+            <div class="days-grid">
+              <button class="day-btn" data-day="1" onclick="toggleDia(this)">L</button><button class="day-btn" data-day="2" onclick="toggleDia(this)">M</button>
+              <button class="day-btn" data-day="3" onclick="toggleDia(this)">M</button><button class="day-btn" data-day="4" onclick="toggleDia(this)">J</button>
+              <button class="day-btn" data-day="5" onclick="toggleDia(this)">V</button><button class="day-btn" data-day="6" onclick="toggleDia(this)">S</button>
+              <button class="day-btn" data-day="0" onclick="toggleDia(this)">D</button>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+            <div class="form-group"><label>Hora Inicio</label><input type="time" id="z-hora" class="form-input"></div>
+            <div class="form-group"><label>Minutos</label><input type="number" id="z-dur" class="form-input"></div>
+          </div>
+          <div class="form-group"><label>Color del Sector</label>
+            <div style="display:flex; gap:8px;">
+              <input type="color" id="z-color" class="form-input" style="padding:2px; height:44px; cursor:pointer;">
+              <button class="btn-outline" style="width:auto; padding:0 14px; font-size:16px;" onclick="usarCuentagotas('z-color')" title="Clonar Color">💧</button>
+            </div>
+          </div>
+          <button class="btn-outline" style="margin-top:16px; background:var(--text-main); color:var(--bg);" onclick="guardarZona()">Guardar Cambios</button>
+          <hr style="border:0; border-top:1px solid var(--border); width:100%; margin:20px 0;">
+          <button class="btn-outline btn-danger" onclick="eliminarItem('zone')">Eliminar Sector</button>
+        </div>
+
+        <!-- CONTENIDO 3: FORMULARIO MARCADOR -->
+        <div id="panel-marker" style="display:none;">
+          <div class="form-group"><label>Etiqueta / Nombre</label><input type="text" id="m-name" class="form-input"></div>
+          <div class="form-group"><label>Tipo de Símbolo</label>
+            <select id="m-icon" class="form-input">
+              <optgroup label="Agua y Riego">
+                <option value="gota">Gota de Agua</option><option value="piscina">Piscina</option>
+                <option value="pozo">Pozo de Agua</option><option value="canal">Canal / Río</option>
+                <option value="aspersor">Aspersor</option><option value="valvula">Válvula / Llave</option>
+              </optgroup>
+              <optgroup label="Terreno y Vegetación">
+                <option value="planta">Planta / Hoja</option><option value="arbol">Árbol Frutal</option><option value="invernadero">Invernadero</option>
+              </optgroup>
+              <optgroup label="Infraestructura">
+                <option value="casa">Casa Principal</option><option value="bodega">Bodega / Galpón</option>
+                <option value="porton">Portón / Reja</option><option value="estacionamiento">Estacionamiento</option>
+                <option value="pin">Pin de Ubicación</option>
+              </optgroup>
+            </select>
+          </div>
+          <div class="form-group"><label>Color del Icono</label>
+            <div style="display:flex; gap:8px;">
+              <input type="color" id="m-color" class="form-input" style="padding:2px; height:44px; cursor:pointer;">
+              <button class="btn-outline" style="width:auto; padding:0 14px; font-size:16px;" onclick="usarCuentagotas('m-color')" title="Clonar Color">💧</button>
+            </div>
+          </div>
+          <div class="form-group"><label>Tamaño</label><input type="range" id="m-scale" min="0.6" max="2.5" step="0.1" value="1" oninput="previewMarkerScale()"></div>
+          
+          <button class="btn-outline" style="margin-top:16px; background:var(--text-main); color:var(--bg);" onclick="guardarMarcador()">Guardar Cambios</button>
+          <hr style="border:0; border-top:1px solid var(--border); width:100%; margin:20px 0;">
+          <button class="btn-outline btn-danger" onclick="eliminarItem('marker')">Eliminar Icono</button>
+        </div>
+
+        <!-- CONTENIDO 4: PANEL DE CONTROL MANUAL Y ESTADO EN VIVO -->
+        <div id="panel-control-manual" style="display:none; flex-direction:column; gap:16px;">
+          
+          <!-- TARJETA DE ESTADO EN VIVO -->
+          <div class="live-status-card">
+            <div class="live-status-title">
+              <span>Estado del Riego</span>
+              <span id="live-state-badge" style="color: var(--text-muted);">Inactivo</span>
+            </div>
+            <div id="live-zone-name" class="live-status-value">Ninguna zona activa</div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 4px;">
+              <div>
+                <div style="font-size: 10px; color: var(--text-muted);">TIEMPO RESTANTE</div>
+                <div id="live-countdown" class="live-timer">--:--</div>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 10px; color: var(--text-muted);">FINALIZA A LAS</div>
+                <div id="live-end-time" style="font-size: 13px; font-weight: 600;">--:--</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Acciones de Pausa</label>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+              <button class="btn-outline btn-warning" onclick="enviarComando('pausar')">⏸️ Pausar</button>
+              <button class="btn-outline" style="background:var(--success); color:#fff; border:none;" onclick="enviarComando('continuar')">▶️ Continuar</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Detener Emergencia</label>
+            <button class="btn-outline btn-danger" onclick="enviarComando('detener')">⏹️ Detener Todo</button>
+          </div>
+
+          <hr style="border:0; border-top:1px solid var(--border); width:100%; margin:10px 0;">
+
+          <div class="form-group">
+            <label>Regar Ahora (Manual)</label>
+            <div class="form-group" style="margin-bottom:8px;">
+              <label style="font-size:10px;">Seleccionar Sector / Válvula</label>
+              <select id="man-sector" class="form-input"></select>
+            </div>
+            <div class="form-group" style="margin-bottom:12px;">
+              <label style="font-size:10px;">Minutos de Duración</label>
+              <input type="number" id="man-minutos" class="form-input" value="5" min="1" max="120">
+            </div>
+            <button class="btn-outline" style="background:var(--primary); color:var(--primary-text); border:none;" onclick="enviarRiegoManual()">🚿 Iniciar Riego Manual</button>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+  </div>
+</main>
+
+<!-- MODAL VISUAL EXTERNO -->
+<div id="visual-modal" class="modal-backdrop">
+  <div class="modal-card">
+    <h3 style="margin: 0 0 20px; font-size:20px;">Ajustes Visuales</h3>
+    <div class="form-group"><label>Oscuridad Exterior (Sombra)</label><input type="range" id="sl-dark" min="0" max="0.9" step="0.05" value="0.5" oninput="updateVisuals()"></div>
+    <div class="form-group"><label>Transparencia de Zonas</label><input type="range" id="sl-alpha" min="0.1" max="0.8" step="0.05" value="0.25" oninput="updateVisuals()"></div>
+    <div class="form-group"><label>Grosor de Perímetro</label><input type="range" id="sl-border" min="1" max="5" step="0.5" value="2.5" oninput="updateVisuals()"></div>
+    <button class="btn-outline" style="width:100%; justify-content:center; margin-top:10px;" onclick="document.getElementById('visual-modal').classList.remove('active')">Cerrar</button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script src="voz.js"></script>
+
+<script>
+function aplicarTema(tema) {
+  if (tema === 'light') document.body.removeAttribute('data-theme'); else document.body.setAttribute('data-theme', tema);
+  localStorage.setItem('riegoTheme', tema);
+  const svgLight = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>';
+  const svgGrey = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a10 10 0 0 0 0 20z" fill="currentColor"></path></svg>';
+  const svgDark = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
+  let svgStr = svgDark; let txt = 'Oscuro';
+  if(tema === 'light') { svgStr = svgLight; txt = 'Claro'; } else if(tema === 'grey') { svgStr = svgGrey; txt = 'Gris'; }
+  document.querySelectorAll('.theme-btn-icon').forEach(btn => { if(btn.querySelector('span')) btn.innerHTML = `${svgStr} <span>${txt}</span>`; else btn.innerHTML = svgStr; });
+}
+function ciclarTema() { let act = localStorage.getItem('riegoTheme') || 'dark'; aplicarTema(act === 'dark' ? 'grey' : (act === 'grey' ? 'light' : 'dark')); }
+aplicarTema(localStorage.getItem('riegoTheme') || 'dark');
+
+let vis = { extDark: 0.5, zoneAlpha: 0.25, borderW: 2.5 };
+function loadVisuals() { const v = JSON.parse(localStorage.getItem('riegoVis') || 'null'); if(v) vis = {...vis, ...v}; document.getElementById('sl-dark').value = vis.extDark; document.getElementById('sl-alpha').value = vis.zoneAlpha; document.getElementById('sl-border').value = vis.borderW; }
+function updateVisuals() { vis.extDark = document.getElementById('sl-dark').value; vis.zoneAlpha = document.getElementById('sl-alpha').value; vis.borderW = document.getElementById('sl-border').value; localStorage.setItem('riegoVis', JSON.stringify(vis)); renderSVG(); }
+function mostrarToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
+function toggleDia(btn) { btn.classList.toggle('active'); }
+
+const DICT_ICONS = {
+  gota: '<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>', piscina: '<path d="M22 12H2M4 12v6a2 2 0 002 2h12a2 2 0 002-2v-6M9 8v4M15 8v4M9 10h6"/>',
+  pozo: '<path d="M5 21v-4M19 21v-4M3 17h18v4H3zM5 17V3M19 17V3M5 7h14M12 7v4M9 11h6v4H9z"/>', canal: '<path d="M2 12c3 3 6-3 10 0s7 3 10 0M2 18c3 3 6-3 10 0s7 3 10 0M2 6c3 3 6-3 10 0s7 3 10 0"/>',
+  aspersor: '<path d="M12 14v8M9 14h6M12 11v3M7 8l2 3M17 8l-2 3M4 5l3 3M20 5l-3 3"/>', valvula: '<path d="M6 9l12 6M6 15l12-6M4 6v12M20 6v12M12 10.5V3M10 3h4"/>',
+  planta: '<path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/>', arbol: '<path d="M12 22v-6M8 8a4 4 0 1 1 8 0c1.5 0 3 1.5 3 3a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4c0-1.5 1.5-3 3-3z"/><circle cx="10" cy="8" r="1"/><circle cx="14" cy="11" r="1"/>',
+  invernadero: '<path d="M2 22h20M4 22V10l8-8 8 8v12M4 14h16M12 10v12M8 10v12M16 10v12"/>', casa: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  bodega: '<path d="M3 21V8l9-4 9 4v13M9 21v-5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v5M4 10h16M4 14h16"/>', porton: '<path d="M4 22V2M20 22V2M4 6h16M4 10h16M4 14h16M4 18h16M9 6v16M15 6v16"/>',
+  estacionamiento: '<path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11M3 11h18v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6z"/><circle cx="7" cy="15" r="1"/><circle cx="17" cy="15" r="1"/>',
+  pin: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>'
+};
+
+const wrapper = document.getElementById('map-wrapper'); const transformEl = document.getElementById('map-transform');
+const imgEl = document.getElementById('map-image'); const svgEl = document.getElementById('map-svg');
+
+let mapState = { mode: 'pan', view: 'map', scale: 1, tx: 0, ty: 0, isDragging: false, startX: 0, startY: 0, clickX: 0, clickY: 0, imgWidth: 0, imgHeight: 0, circleCenter: null, tempRadius: 0 };
+let perimeter = []; let zones = []; let markers = []; let currentDraw = []; let selectedItem = { type: null, id: null }; let draggingMarkerId = null;
+
+const firebaseConfig = { apiKey: "AIzaSyCABy9Rpn1wc1gYBzDEm8Mf05x0gu9lpyQ", authDomain: "portonpirque.firebaseapp.com", databaseURL: "https://portonpique-default-rtdb.firebaseio.com/", projectId: "portonpirque" };
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth(); const db = firebase.database(); const ADMIN_EMAIL = "pirqueporton@gmail.com";
+
+auth.onAuthStateChanged((user) => {
+  if(!user || user.email !== ADMIN_EMAIL) window.location.href = 'index.html';
+  else {
+    loadVisuals();
+    db.ref('modulo_riego').once('value').then(snap => {
+      const data = snap.val() || {};
+      if(data.mapa) cargarDatosAlMapa(data.mapa, data.perimeter||[], data.zones||[], data.markers||[], data.view);
+      actualizarSelectorSectoresManual();
+    });
+
+    db.ref('modulo_riego/estado_riego').on('value', (snap) => {
+      const estado = snap.val() || {};
+      actualizarIndicadorEstado(estado.ultima_conexion);
+      actualizarEstadoEnVivo(estado);
+    });
+  }
+});
+
+function actualizarIndicadorEstado(timestamp) {
+  const badge = document.getElementById('esp-status-badge');
+  const text = document.getElementById('esp-status-text');
+
+  if (!timestamp) {
+    badge.className = "status-badge offline";
+    text.textContent = "Sin conexión";
+    return;
+  }
+
+  const tsMilis = Number(timestamp) < 10000000000 ? Number(timestamp) * 1000 : Number(timestamp);
+  const diferenciaSegundos = (Date.now() - tsMilis) / 1000;
+
+  if (diferenciaSegundos >= -10 && diferenciaSegundos < 20) {
+    badge.className = "status-badge online";
+    text.textContent = "En línea";
+  } else {
+    badge.className = "status-badge offline";
+    text.textContent = "Sin conexión";
+  }
+}
+
+let estadoRiegoActual = null;
+
+function actualizarEstadoEnVivo(estado) {
+  estadoRiegoActual = estado || null;
+  renderEstadoEnVivo();
+}
+
+function renderEstadoEnVivo() {
+  const estado = estadoRiegoActual;
+  const badge = document.getElementById('live-state-badge');
+  const nameEl = document.getElementById('live-zone-name');
+  const timerEl = document.getElementById('live-countdown');
+  const endEl = document.getElementById('live-end-time');
+
+  if (!estado || (!estado.regando && !estado.pausa)) {
+    badge.textContent = "Inactivo";
+    badge.style.color = "var(--text-muted)";
+    nameEl.textContent = "Ninguna zona activa";
+    timerEl.textContent = "00:00";
+    endEl.textContent = "--:--";
+    return;
+  }
+
+  const sectorIdx = Number.isFinite(Number(estado.sector)) ? Number(estado.sector) : 0;
+  const zName = zones[sectorIdx]
+    ? (zones[sectorIdx].name || `Sector ${sectorIdx + 1}`)
+    : `Relé ${sectorIdx + 1}`;
+
+  if (estado.regando) {
+    badge.textContent = estado.modo === "manual" ? "Regando manual 💧" : "Regando 💧";
+    badge.style.color = "var(--success)";
+  } else {
+    badge.textContent = "Pausado ⏸️";
+    badge.style.color = "var(--warning)";
+  }
+
+  nameEl.textContent = zName;
+
+  const fin = Number(estado.finEpoch || 0);
+  if (fin > 0) {
+    const ahoraEpoch = Math.floor(Date.now() / 1000);
+    const segundosRestantes = Math.max(0, fin - ahoraEpoch);
+
+    const mins = Math.floor(segundosRestantes / 60).toString().padStart(2, '0');
+    const secs = (segundosRestantes % 60).toString().padStart(2, '0');
+    timerEl.textContent = `${mins}:${secs}`;
+
+    const endDate = new Date(fin * 1000);
+    endEl.textContent = segundosRestantes > 0
+      ? endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : "Expirado";
+  } else {
+    timerEl.textContent = "00:00";
+    endEl.textContent = "--:--";
+  }
+}
+
+setInterval(renderEstadoEnVivo, 1000);
+
+function cerrarSesion() { auth.signOut().then(() => window.location.href = 'index.html'); }
+function procesarYComprimirImagen(e) {
+  const file = e.target.files[0]; if(!file) return; mostrarToast("Procesando plano..."); const reader = new FileReader();
+  reader.onload = (e) => { 
+    const img = new Image(); img.onload = () => {
+      const canvas = document.createElement('canvas'); let w = img.width; let h = img.height;
+      if (w > 1200) { h = Math.round((h * 1200) / w); w = 1200; }
+      canvas.width = w; canvas.height = h; canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const b64 = canvas.toDataURL('image/jpeg', 0.6);
+      db.ref('modulo_riego').set({ mapa: b64, perimeter: [], zones: [], markers: [] }).then(() => { cargarDatosAlMapa(b64, [], [], [], null); mostrarToast("¡Plano sincronizado!"); });
+    }; img.src = e.target.result; 
+  }; reader.readAsDataURL(file);
+}
+function guardarTodoDB() { db.ref('modulo_riego').update({ perimeter, zones, markers }); }
+function guardarVistaDB() { if (mapState.imgWidth > 0) db.ref('modulo_riego/view').set({ tx: mapState.tx, ty: mapState.ty, scale: mapState.scale }); }
+
+function ajustarMapaMovil() {
+  if (window.innerWidth > 850) return;
+  let targetW = mapState.imgWidth, targetH = mapState.imgHeight;
+  let minX = 0, minY = 0;
+  
+  if (perimeter && perimeter.length > 2) {
+    const xs = perimeter.map(p => p.x);
+    const ys = perimeter.map(p => p.y);
+    minX = Math.min(...xs); 
+    minY = Math.min(...ys);
+    targetW = Math.max(...xs) - minX;
+    targetH = Math.max(...ys) - minY;
+  }
+  
+  const pad = 40; 
+  const scaleX = (wrapper.clientWidth - pad * 2) / (targetW || 1);
+  const scaleY = (wrapper.clientHeight - pad * 2) / (targetH || 1);
+  
+  mapState.scale = Math.min(scaleX, scaleY);
+  mapState.tx = (wrapper.clientWidth / 2) - ((minX + targetW / 2) * mapState.scale);
+  mapState.ty = (wrapper.clientHeight / 2) - ((minY + targetH / 2) * mapState.scale);
+}
+
+function cargarDatosAlMapa(b64, p, z, m, v) {
+  document.getElementById('map-ambient-bg').style.backgroundImage = `url(${b64})`;
+  if (mapState.view === 'map') document.getElementById('map-ambient-bg').style.opacity = '0.5';
+  imgEl.onload = () => {
+    mapState.imgWidth = imgEl.naturalWidth; mapState.imgHeight = imgEl.naturalHeight;
+    transformEl.style.width = mapState.imgWidth + 'px'; transformEl.style.height = mapState.imgHeight + 'px';
+    svgEl.setAttribute('viewBox', `0 0 ${mapState.imgWidth} ${mapState.imgHeight}`);
+    if (v) { mapState.scale = v.scale; mapState.tx = v.tx; mapState.ty = v.ty; } 
+    else { mapState.scale = Math.min(wrapper.clientWidth/mapState.imgWidth, wrapper.clientHeight/mapState.imgHeight) * 0.9; mapState.tx = (wrapper.clientWidth - (mapState.imgWidth*mapState.scale)) / 2; mapState.ty = (wrapper.clientHeight - (mapState.imgHeight*mapState.scale)) / 2; }
+    
+    perimeter = p; zones = z; markers = m; currentDraw = []; 
+    
+    if (window.innerWidth <= 850) { ajustarMapaMovil(); }
+
+    actualizarTransform(); renderSVG(); actualizarSelectorSectoresManual(); renderEstadoEnVivo();
+    
+    // CORRECCIÓN SÚPER-HACK: Obligamos al celular a aplicar los tamaños de Flexbox correctamente
+    setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 100);
+  }; imgEl.src = b64; imgEl.style.display = 'block';
+}
+
+function setView(v) {
+  mapState.view = v; document.getElementById('btn-view-map').classList.remove('active'); document.getElementById('btn-view-minimal').classList.remove('active'); document.getElementById('btn-view-' + v).classList.add('active');
+  const ambilight = document.getElementById('map-ambient-bg');
+  if (v === 'map') { wrapper.classList.remove('view-minimal'); imgEl.style.opacity = '1'; ambilight.style.opacity = '0.5'; } else { wrapper.classList.add('view-minimal'); imgEl.style.opacity = '0'; ambilight.style.opacity = '0'; }
+  renderSVG();
+}
+function setMode(mode) {
+  mapState.mode = mode; document.querySelectorAll('.tool-btn').forEach(b => { if(b.id.startsWith('btn-mode')) b.classList.remove('active'); }); document.getElementById('btn-mode-' + mode).classList.add('active');
+  transformEl.className = (mode !== 'pan') ? 'drawing' : ''; currentDraw = []; mapState.circleCenter = null; renderSVG();
+}
+function actualizarTransform() { transformEl.style.transform = `translate(${mapState.tx}px, ${mapState.ty}px) scale(${mapState.scale})`; }
+function zoomMap(delta) { const o = mapState.scale; mapState.scale = Math.max(0.1, Math.min(mapState.scale + delta, 5)); const cx = wrapper.clientWidth / 2; const cy = wrapper.clientHeight / 2; mapState.tx = cx - (cx - mapState.tx) * (mapState.scale / o); mapState.ty = cy - (cy - mapState.ty) * (mapState.scale / o); actualizarTransform(); guardarVistaDB(); }
+wrapper.addEventListener('wheel', (e) => { e.preventDefault(); zoomMap(e.deltaY < 0 ? 0.1 : -0.1); });
+
+function getSVGCoords(cx, cy) { const r = transformEl.getBoundingClientRect(); return { x: (cx - r.left) / mapState.scale, y: (cy - r.top) / mapState.scale }; }
+function pointInPoly(pt, poly) { let is = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { let xi = poly[i].x, yi = poly[i].y; let xj = poly[j].x, yj = poly[j].y; let ix = ((yi > pt.y) !== (yj > pt.y)) && (pt.x < (xj - xi) * (pt.y - yi) / (yj - yi) + xi); if (ix) is = !is; } return is; }
+
+wrapper.addEventListener('pointerdown', (e) => {
+  if(e.target.closest('button') && !e.target.closest('.marker-group')) return; if(!e.isPrimary) return; 
+  mapState.clickX = e.clientX; mapState.clickY = e.clientY;
+  const mTarget = e.target.closest('.marker-group');
+  if (mTarget && mapState.mode === 'pan') { draggingMarkerId = mTarget.getAttribute('data-id'); wrapper.setPointerCapture(e.pointerId); seleccionarPanel('marker', draggingMarkerId); return; }
+
+  if(mapState.mode === 'pan') { mapState.isDragging = true; mapState.startX = e.clientX - mapState.tx; mapState.startY = e.clientY - mapState.ty; wrapper.setPointerCapture(e.pointerId); } 
+  else if (mapState.mode === 'marker') { const c = getSVGCoords(e.clientX, e.clientY); const nId = Date.now().toString(); markers.push({ id: nId, x: c.x, y: c.y, name: "Ubicación", iconType: "pin", color: "#3B82F6", scale: 1 }); guardarTodoDB(); setMode('pan'); seleccionarPanel('marker', nId); }
+  else if (mapState.mode === 'circle') { const c = getSVGCoords(e.clientX, e.clientY); mapState.circleCenter = c; wrapper.setPointerCapture(e.pointerId); }
+  else {
+    const c = getSVGCoords(e.clientX, e.clientY); currentDraw.push(c); renderSVG();
+    if(currentDraw.length > 2 && Math.hypot(currentDraw[0].x - c.x, currentDraw[0].y - c.y) < (30/mapState.scale)) {
+      if(mapState.mode === 'perimeter') { perimeter = [...currentDraw]; guardarTodoDB(); setMode('pan'); } 
+      else if (mapState.mode === 'zone') { const nId = Date.now().toString(); zones.push({ id: nId, name: "Sector", points: [...currentDraw], config: { dias: [], hora: "06:00", duracion: "15", color: "#00D4FF" } }); guardarTodoDB(); setMode('pan'); seleccionarPanel('zone', nId); }
+    }
+  }
+});
+
+wrapper.addEventListener('pointermove', (e) => {
+  if(!e.isPrimary) return;
+  if(draggingMarkerId) { const c = getSVGCoords(e.clientX, e.clientY); const m = markers.find(x => x.id === draggingMarkerId); if(m) { m.x = c.x; m.y = c.y; renderSVG(); } } 
+  else if(mapState.isDragging) { mapState.tx = e.clientX - mapState.startX; mapState.ty = e.clientY - mapState.startY; actualizarTransform(); } 
+  else if (mapState.mode === 'circle' && mapState.circleCenter) { const c = getSVGCoords(e.clientX, e.clientY); mapState.tempRadius = Math.hypot(c.x - mapState.circleCenter.x, c.y - mapState.circleCenter.y); renderSVG(c); }
+  else if (mapState.mode === 'zone' || mapState.mode === 'perimeter') { if (currentDraw.length > 0) { renderSVG(getSVGCoords(e.clientX, e.clientY)); } }
+});
+
+wrapper.addEventListener('pointerup', (e) => {
+  if(!e.isPrimary) return; wrapper.releasePointerCapture(e.pointerId);
+  if(draggingMarkerId) { draggingMarkerId = null; guardarTodoDB(); return; }
+  
+  if (mapState.mode === 'circle' && mapState.circleCenter) {
+    if (mapState.tempRadius > 10 / mapState.scale) {
+      const pts = []; const numPts = 32;
+      for(let i=0; i<numPts; i++) { const a = (i/numPts) * Math.PI * 2; pts.push({ x: mapState.circleCenter.x + mapState.tempRadius * Math.cos(a), y: mapState.circleCenter.y + mapState.tempRadius * Math.sin(a) }); }
+      const nId = Date.now().toString(); zones.push({ id: nId, name: "Sector Circular", points: pts, config: { dias: [], hora: "06:00", duracion: "15", color: "#00D4FF" } });
+      guardarTodoDB(); seleccionarPanel('zone', nId);
+    }
+    mapState.circleCenter = null; mapState.tempRadius = 0; setMode('pan');
+  }
+
+  const wD = mapState.isDragging; mapState.isDragging = false; 
+  const dist = Math.hypot(e.clientX - mapState.clickX, e.clientY - mapState.clickY);
+  if (wD && dist >= 5) { guardarVistaDB(); }
+  if (dist < 5 && mapState.mode === 'pan') {
+    const c = getSVGCoords(e.clientX, e.clientY); let zId = null;
+    for (let i = zones.length - 1; i >= 0; i--) { if (pointInPoly(c, zones[i].points)) { zId = zones[i].id; break; } }
+    if (zId) { seleccionarPanel('zone', zId); }
+    else if (!e.target.closest('button') && !e.target.closest('.marker-group')) { cerrarPanelLateral(); }
+  }
+});
+
+function renderSVG(cursorCoord = null) {
+  let html = '';
+  if(perimeter.length > 2) {
+    const ptsP = perimeter.map(p => `${p.x},${p.y}`).join(' ');
+    if (mapState.view === 'map') {
+      let dMask = `M 0 0 L ${mapState.imgWidth} 0 L ${mapState.imgWidth} ${mapState.imgHeight} L 0 ${mapState.imgHeight} Z M ${perimeter[0].x} ${perimeter[0].y} `;
+      for(let i=1; i<perimeter.length; i++) dMask += `L ${perimeter[i].x} ${perimeter[i].y} `;
+      html += `<path d="${dMask}Z" fill="rgba(0,0,0,${vis.extDark})" fill-rule="evenodd" pointer-events="none" /> <polygon points="${ptsP}" fill="rgba(100,100,100,0.05)" stroke="none" />`;
+    }
+    html += `<polygon points="${ptsP}" fill="none" stroke="var(--cyan-glow)" stroke-width="${vis.borderW}" filter="drop-shadow(0 0 6px rgba(160,224,255,0.6))" pointer-events="none" />`;
+  }
+  zones.forEach(z => {
+    const isSel = (selectedItem.type === 'zone' && selectedItem.id === z.id); const color = z.config?.color || '#00D4FF';
+    const pts = z.points.map(p => `${p.x},${p.y}`).join(' '); const alpha = isSel ? Math.min(1, parseFloat(vis.zoneAlpha)+0.2) : vis.zoneAlpha;
+    html += `<polygon class="zone-poly ${isSel?'selected':''}" points="${pts}" fill="${color}" fill-opacity="${alpha}" stroke="${isSel?'#fff':color}" stroke-width="${isSel?2.5:1.5}" pointer-events="all" />`;
+  });
+  if (mapState.mode === 'circle' && mapState.circleCenter && mapState.tempRadius > 0) {
+    html += `<circle cx="${mapState.circleCenter.x}" cy="${mapState.circleCenter.y}" r="${mapState.tempRadius}" fill="rgba(0,212,255,0.2)" stroke="var(--cyan-glow)" stroke-width="2" stroke-dasharray="6 4" pointer-events="none" />`;
+  }
+  markers.forEach(m => {
+    const isSel = (selectedItem.type === 'marker' && selectedItem.id === m.id); const s = m.scale || 1;
+    const tW = m.name.length * 7 + 16; const sS = DICT_ICONS[m.iconType] || DICT_ICONS['gota'];
+    html += `<g class="marker-group ${isSel?'selected':''}" data-id="${m.id}" style="transform: translate(${m.x}px, ${m.y}px) scale(${s}); cursor: grab;" pointer-events="all"><circle cx="0" cy="0" r="24" fill="transparent" /><circle class="icon-bg" cx="0" cy="0" r="14" fill="${m.color}" stroke="${isSel?'#fff':'none'}" stroke-width="2.5" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.5))"/><svg x="-9" y="-9" width="18" height="18" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" pointer-events="none">${sS}</svg><rect x="${-tW/2}" y="19" width="${tW}" height="20" rx="10" fill="rgba(15, 23, 42, 0.85)" stroke="rgba(255,255,255,0.1)" pointer-events="none"/><text x="0" y="33" fill="#fff" font-size="10.5" font-weight="600" text-anchor="middle" pointer-events="none">${m.name}</text></g>`;
+  });
+  if(currentDraw.length > 0) {
+    let d = `M ${currentDraw[0].x} ${currentDraw[0].y} `; for(let i=1; i<currentDraw.length; i++) d += `L ${currentDraw[i].x} ${currentDraw[i].y} `; if(cursorCoord) d += `L ${cursorCoord.x} ${cursorCoord.y}`;
+    html += `<path d="${d}" class="draw-line" fill="none" pointer-events="none"/>`;
+  }
+  svgEl.innerHTML = html;
+}
+
+function abrirPanelLateral(tipo) {
+  document.getElementById('main-layout').classList.add('panel-open');
+  document.getElementById('panel-tools').style.display = 'none';
+  document.getElementById('panel-zone').style.display = 'none';
+  document.getElementById('panel-marker').style.display = 'none';
+  document.getElementById('panel-control-manual').style.display = 'none';
+  
+  if (tipo === 'tools') {
+    document.getElementById('side-panel-title').textContent = "Edición de Mapa";
+    document.getElementById('panel-tools').style.display = 'flex';
+  } else if (tipo === 'zone') {
+    document.getElementById('side-panel-title').textContent = "Configurar Sector";
+    document.getElementById('panel-zone').style.display = 'block';
+  } else if (tipo === 'marker') {
+    document.getElementById('side-panel-title').textContent = "Configurar Icono";
+    document.getElementById('panel-marker').style.display = 'block';
+  } else if (tipo === 'control-manual') {
+    document.getElementById('side-panel-title').textContent = "Control Manual y Estado";
+    document.getElementById('panel-control-manual').style.display = 'flex';
+    actualizarSelectorSectoresManual();
+  }
+}
+
+function cerrarPanelLateral() {
+  document.getElementById('main-layout').classList.remove('panel-open');
+  selectedItem = { type: null, id: null };
+  setMode('pan'); 
+  renderSVG();
+}
+
+function seleccionarPanel(type, id) {
+  selectedItem = { type, id }; renderSVG();
+  if (!type) { cerrarPanelLateral(); return; }
+  
+  abrirPanelLateral(type);
+  if (type === 'zone') {
+    const z = zones.find(x => x.id === id); if(!z) return;
+    document.getElementById('z-hora').value = z.config?.hora || "06:00"; 
+    document.getElementById('z-dur').value = z.config?.duracion || "15"; 
+    document.getElementById('z-color').value = z.config?.color || "#00D4FF";
+    
+    const diasActivos = z.config?.dias || [];
+    document.querySelectorAll('.day-btn').forEach(btn => { 
+      if(diasActivos.includes(btn.getAttribute('data-day'))) btn.classList.add('active'); 
+      else btn.classList.remove('active'); 
+    });
+  } else if (type === 'marker') {
+    const m = markers.find(x => x.id === id); if(!m) return;
+    document.getElementById('m-name').value = m.name; document.getElementById('m-icon').value = m.iconType || 'gota'; document.getElementById('m-color').value = m.color; document.getElementById('m-scale').value = m.scale;
+  }
+}
+
+function validarSolapamiento(nuevaHora, nuevaDuracionMin, nuevosDias, idActual) {
+  if (!nuevosDias || nuevosDias.length === 0) return null;
+  const [nHora, nMin] = nuevaHora.split(':').map(Number);
+  const inicioNuevoMin = nHora * 60 + nMin;
+  const finNuevoMin = inicioNuevoMin + parseInt(nuevaDuracionMin);
+
+  for (let z of zones) {
+    if (z.id === idActual) continue;
+    if (!z.config || !z.config.hora || !z.config.duracion || !z.config.dias) continue;
+
+    const comparteDia = z.config.dias.some(dia => nuevosDias.includes(dia));
+    if (!comparteDia) continue;
+
+    const [zHora, zMin] = z.config.hora.split(':').map(Number);
+    const inicioZMin = zHora * 60 + zMin;
+    const finZMin = inicioZMin + parseInt(z.config.duracion);
+
+    if (inicioNuevoMin < finZMin && finNuevoMin > inicioZMin) {
+      return z.name || "Otro Sector";
+    }
+  }
+  return null;
+}
+
+async function usarCuentagotas(inputId) {
+  if (!window.EyeDropper) return mostrarToast('Cuentagotas no compatible.');
+  try { const ed = new EyeDropper(); const res = await ed.open(); document.getElementById(inputId).value = res.sRGBHex; } catch(e) {}
+}
+
+function guardarZona() { 
+  const z = zones.find(x => x.id === selectedItem.id); 
+  if(!z) return; 
+  
+  const hora = document.getElementById('z-hora').value; 
+  const duracion = document.getElementById('z-dur').value; 
+  const color = document.getElementById('z-color').value; 
+  const dias = []; 
+  document.querySelectorAll('.day-btn.active').forEach(btn => dias.push(btn.getAttribute('data-day'))); 
+
+  if(!hora || !duracion) {
+    mostrarToast("Ingrese hora y duración válidas.");
+    return;
+  }
+
+  const solapadoCon = validarSolapamiento(hora, duracion, dias, z.id);
+  if (solapadoCon) {
+    alert(`⚠️ Conflicto de horario: Este sector se cruza con "${solapadoCon}" en los días seleccionados.`);
+    return;
+  }
+
+  if (!z.config) z.config = {};
+  z.config.hora = hora; 
+  z.config.duracion = duracion; 
+  z.config.color = color; 
+  z.config.dias = dias; 
+
+  guardarTodoDB(); 
+  renderSVG(); 
+  cerrarPanelLateral(); 
+  mostrarToast("¡Sector actualizado correctamente!");
+}
+
+function guardarMarcador() { const m = markers.find(x => x.id === selectedItem.id); if(!m) return; m.name = document.getElementById('m-name').value; m.iconType = document.getElementById('m-icon').value; m.color = document.getElementById('m-color').value; m.scale = parseFloat(document.getElementById('m-scale').value); guardarTodoDB(); renderSVG(); mostrarToast("Icono Guardado"); cerrarPanelLateral(); }
+function previewMarkerScale() { const m = markers.find(x => x.id === selectedItem.id); if(m) { m.scale = parseFloat(document.getElementById('m-scale').value); renderSVG(); } }
+function eliminarItem(type) { if(confirm('¿Eliminar este elemento permanentemente?')) { if(type === 'zone') zones = zones.filter(x => x.id !== selectedItem.id); else markers = markers.filter(x => x.id !== selectedItem.id); guardarTodoDB(); cerrarPanelLateral(); } }
+
+function enviarComando(accion) {
+  return db.ref('modulo_riego/comando').set({
+    accion: accion,
+    timestamp: firebase.database.ServerValue.TIMESTAMP
+  }).then(() => {
+    mostrarToast(`Comando enviado: ${accion}`);
+  }).catch((err) => {
+    console.error(err);
+    mostrarToast("Error al enviar comando");
+  });
+}
+
+function enviarRiegoManual() {
+  const sector = parseInt(document.getElementById('man-sector').value, 10);
+  const minutos = parseInt(document.getElementById('man-minutos').value, 10);
+
+  if (!Number.isInteger(sector) || sector < 0 || sector >= 8) {
+    mostrarToast("Seleccione un sector válido.");
+    return;
+  }
+  if (!Number.isInteger(minutos) || minutos < 1 || minutos > 120) {
+    mostrarToast("La duración debe ser entre 1 y 120 minutos.");
+    return;
+  }
+
+  db.ref('modulo_riego/comando').set({
+    accion: "manual",
+    sector: sector,
+    minutos: minutos,
+    timestamp: firebase.database.ServerValue.TIMESTAMP
+  }).then(() => {
+    mostrarToast(`Riego manual enviado: Sector ${sector + 1} · ${minutos} min`);
+  }).catch((err) => {
+    console.error(err);
+    mostrarToast("Error al iniciar riego manual");
+  });
+}
+
+function actualizarSelectorSectoresManual() {
+  const select = document.getElementById('man-sector');
+  select.innerHTML = '';
+  zones.forEach((z, index) => {
+    const opt = document.createElement('option');
+    opt.value = index; 
+    opt.textContent = `${z.name || 'Sector'} (Relé ${index + 1})`;
+    select.appendChild(opt);
+  });
+  if(zones.length === 0) {
+    const opt = document.createElement('option');
+    opt.value = 0;
+    opt.textContent = "Relé 1 (Por defecto)";
+    select.appendChild(opt);
+  }
+}
+</script>
+</body>
+</html>

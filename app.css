@@ -1,0 +1,395 @@
+/* ==========================================================
+   SMART HUB · CAPA VISUAL COMÚN
+   Solo presentación y responsive. No contiene lógica.
+   ========================================================== */
+
+:root {
+  --app-bg: var(--bg);
+  --app-surface: var(--surface);
+  --app-border: var(--border);
+  --app-text: var(--text-main);
+  --app-muted: var(--text-muted);
+  --app-accent: var(--cyan-glow);
+  --app-radius-sm: 12px;
+  --app-radius-md: 16px;
+  --app-radius-lg: 22px;
+  --app-space-1: 4px;
+  --app-space-2: 8px;
+  --app-space-3: 12px;
+  --app-space-4: 16px;
+  --app-space-5: 20px;
+  --app-space-6: 24px;
+  --app-space-8: 32px;
+  --app-sidebar: 80px;
+  --app-nav-mobile: 74px;
+  --app-content-max: 1440px;
+  --app-header-title: clamp(24px, 2vw, 28px);
+  --app-shadow-soft: 0 12px 32px -18px rgba(0,0,0,.35);
+}
+
+* { -webkit-tap-highlight-color: transparent; }
+html, body { width: 100%; }
+body.app-shell {
+  min-height: 100dvh;
+  height: 100dvh;
+  background: var(--bg);
+  color: var(--text-main);
+}
+
+/* ---------- Navegación global ---------- */
+body.app-shell .dash-sidebar {
+  width: var(--app-sidebar);
+  flex: 0 0 var(--app-sidebar);
+  background: color-mix(in srgb, var(--bg) 96%, var(--surface) 4%);
+  border-right: 1px solid var(--border);
+  padding-top: 22px;
+}
+body.app-shell .dash-logo-icon {
+  width: 44px;
+  height: 44px;
+  margin-bottom: 28px;
+  border-radius: 14px;
+  box-shadow: var(--app-shadow-soft);
+}
+body.app-shell .dash-nav-item {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  margin-bottom: 10px;
+}
+body.app-shell .dash-nav-item.active {
+  box-shadow: var(--app-shadow-soft);
+}
+body.app-shell .dash-nav-item svg { width: 20px; height: 20px; }
+body.app-shell .dash-footer { padding: 12px 10px; }
+
+/* ---------- Contenedor global ---------- */
+body.app-shell .dash-content {
+  min-width: 0;
+  padding: 30px clamp(24px, 3vw, 44px);
+}
+body.app-shell:not(.page-riego) .dash-content { overflow-y: auto; }
+body.app-shell .app-content-inner {
+  width: 100%;
+  max-width: var(--app-content-max);
+  margin: 0 auto;
+}
+
+/* ---------- Cabecera global ---------- */
+body.app-shell .app-page-header,
+body.app-shell .header-bar,
+body.app-shell .riego-header-bar {
+  width: 100%;
+  min-height: 58px;
+  margin-bottom: 26px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+body.app-shell .dash-title {
+  margin: 0 0 6px;
+  font-size: var(--app-header-title);
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.55px;
+  color: var(--text-main);
+}
+body.app-shell .dash-subtitle {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+body.app-shell .header-actions { gap: 10px; }
+body.app-shell .btn-icon,
+body.app-shell .btn-theme {
+  min-width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  box-shadow: none;
+}
+body.app-shell .btn-icon:hover,
+body.app-shell .btn-theme:hover {
+  transform: translateY(-1px);
+}
+
+/* ---------- Estados globales ---------- */
+body.app-shell .status-badge,
+body.app-shell .status-container {
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: none;
+  font-weight: 650;
+}
+body.app-shell .status-badge {
+  padding: 5px 9px;
+  font-size: 11.5px;
+}
+body.app-shell .status-container {
+  padding: 9px 14px;
+  font-size: 13px;
+}
+body.app-shell .status-dot { flex: 0 0 auto; }
+
+/* ---------- Tarjetas ---------- */
+body.app-shell .dash-grid { gap: 18px; }
+body.app-shell .dash-card {
+  border-radius: var(--app-radius-md);
+  border: 1px solid var(--border);
+  box-shadow: var(--app-shadow-soft);
+}
+body.app-shell .card-header {
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: .01em;
+}
+body.app-shell .dash-value {
+  font-size: 28px;
+  letter-spacing: -.4px;
+}
+
+/* ==========================================================
+   INICIO
+   ========================================================== */
+body.page-inicio .dash-content {
+  padding-top: 36px;
+}
+body.page-inicio .home-header { margin-bottom: 28px; }
+body.page-inicio .home-grid {
+  max-width: 1080px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+body.page-inicio .dash-card {
+  min-height: 152px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+}
+body.page-inicio .dash-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--text-muted) 35%, var(--border));
+}
+body.page-inicio .card-header {
+  margin-bottom: 22px;
+  color: var(--text-muted);
+}
+body.page-inicio .card-header svg {
+  width: 19px;
+  height: 19px;
+  color: var(--text-muted);
+}
+body.page-inicio .dash-value { margin-top: auto; }
+body.page-inicio .dash-sub-value { line-height: 1.4; }
+
+/* ==========================================================
+   PORTÓN
+   ========================================================== */
+body.page-porton .dash-content { min-height: 0; }
+body.page-porton .center-stage {
+  min-height: 0;
+  padding: 12px 0 42px;
+}
+body.page-porton .gate-btn-wrap {
+  width: clamp(180px, 20vw, 224px);
+  height: clamp(180px, 20vw, 224px);
+  margin-bottom: 26px;
+}
+body.page-porton .gate-btn {
+  border-width: 2px;
+  box-shadow: 0 0 40px rgba(0,212,255,.08), inset 0 0 24px rgba(0,212,255,.035);
+}
+body.page-porton .gate-btn svg {
+  width: clamp(52px, 5vw, 62px);
+  height: clamp(52px, 5vw, 62px);
+}
+body.page-porton .status-container {
+  min-width: 154px;
+  justify-content: center;
+}
+body.page-porton .modal-card-large { border-radius: 22px; }
+
+/* ==========================================================
+   RIEGO
+   ========================================================== */
+body.page-riego .dash-content {
+  padding: 24px clamp(22px, 2.6vw, 34px);
+}
+body.page-riego .riego-header-bar { margin-bottom: 20px; }
+body.page-riego .dash-subtitle { gap: 10px; flex-wrap: wrap; }
+/* El tema sigue accesible desde la navegación global; evitamos duplicarlo en cabecera. */
+body.page-riego #theme-btn { display: none; }
+body.page-riego .riego-map-wrapper,
+body.page-riego .side-panel { border-radius: 18px; }
+body.page-riego .floating-tools-btn {
+  min-height: 42px;
+  padding: 10px 18px;
+  font-size: 12.5px;
+}
+body.page-riego .side-panel-content { padding: 22px; }
+body.page-riego .panel-title { font-size: 18px; }
+
+/* ==========================================================
+   TABLET
+   ========================================================== */
+@media (min-width: 901px) and (max-width: 1180px) {
+  body.app-shell .dash-content { padding-left: 26px; padding-right: 26px; }
+  body.page-inicio .home-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body.page-riego .riego-layout.panel-open { gap: 16px; }
+  body.page-riego .riego-layout.panel-open .side-panel { width: 330px; }
+  body.page-riego .side-panel-content { width: 330px; }
+}
+
+/* ==========================================================
+   MÓVIL / TABLET VERTICAL
+   ========================================================== */
+@media (max-width: 900px) {
+  body.app-shell {
+    display: block;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  body.app-shell .dash-sidebar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    width: 100%;
+    height: var(--app-nav-mobile);
+    padding: 0 max(4px, env(safe-area-inset-left));
+    padding-bottom: env(safe-area-inset-bottom);
+    border-right: 0;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: space-around;
+    gap: 0;
+    background: color-mix(in srgb, var(--bg) 96%, var(--surface) 4%);
+    z-index: 4000;
+  }
+  body.app-shell .dash-logo-icon { display: none; }
+  body.app-shell .dash-nav-item {
+    width: auto;
+    min-width: 58px;
+    height: 100%;
+    margin: 0;
+    padding: 8px 8px 7px;
+    border: 0 !important;
+    border-radius: 0;
+    box-shadow: none !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    background: transparent !important;
+  }
+  body.app-shell .dash-nav-item svg { width: 20px; height: 20px; }
+  body.app-shell .dash-nav-item::after {
+    content: attr(data-label);
+    display: block;
+    max-width: 64px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 9.5px;
+    line-height: 1;
+    font-weight: 650;
+    letter-spacing: -.1px;
+    color: currentColor;
+  }
+  body.app-shell .dash-nav-item.active { color: var(--text-main); }
+  body.app-shell .dash-nav-item.active::before {
+    content: '';
+    position: absolute;
+    top: 5px;
+    left: 50%;
+    width: 26px;
+    height: 3px;
+    transform: translateX(-50%);
+    border-radius: 99px;
+    background: var(--text-main);
+    opacity: .9;
+  }
+  body.app-shell .dash-footer {
+    width: auto;
+    height: 100%;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    display: flex;
+    align-items: stretch;
+  }
+  body.app-shell .dash-footer .dash-nav-item { width: auto !important; }
+
+  body.app-shell .dash-content {
+    width: 100%;
+    height: 100dvh;
+    padding: 20px 18px calc(var(--app-nav-mobile) + 18px);
+    overflow-y: auto;
+  }
+  body.app-shell .app-page-header,
+  body.app-shell .header-bar,
+  body.app-shell .riego-header-bar {
+    min-height: 0;
+    margin-bottom: 20px;
+    gap: 14px;
+  }
+  body.app-shell .dash-title { font-size: 23px; margin-bottom: 5px; }
+  body.app-shell .dash-subtitle { font-size: 12.5px; }
+  body.app-shell .header-actions { flex: 0 0 auto; }
+  body.app-shell .btn-icon,
+  body.app-shell .btn-theme { width: 40px; min-width: 40px; height: 40px; }
+
+  body.page-inicio .dash-content { padding-top: 24px; }
+  body.page-inicio .home-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  body.page-inicio .dash-card { min-height: 138px; padding: 18px; }
+
+  body.page-porton .center-stage { padding-bottom: 28px; }
+  body.page-porton .gate-btn-wrap { width: min(52vw, 210px); height: min(52vw, 210px); }
+  body.page-porton .modal-card-large {
+    width: calc(100% - 20px);
+    height: auto;
+    max-height: calc(100dvh - var(--app-nav-mobile) - 20px);
+    padding: 20px;
+    border-radius: 20px;
+  }
+
+  body.page-riego .dash-content {
+    height: 100dvh;
+    padding: 16px 14px calc(var(--app-nav-mobile) + 12px);
+    overflow: hidden;
+  }
+  body.page-riego .riego-header-bar {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+  body.page-riego .header-actions { width: auto; flex-wrap: nowrap; }
+  body.page-riego .riego-layout { min-height: 0; }
+  body.page-riego .side-panel {
+    bottom: var(--app-nav-mobile) !important;
+    max-height: calc(100dvh - var(--app-nav-mobile) - 74px);
+  }
+  body.page-riego .floating-tools-container { bottom: 14px; }
+}
+
+@media (max-width: 620px) {
+  body.page-inicio .home-grid { grid-template-columns: 1fr; }
+  body.page-inicio .dash-card { min-height: 126px; }
+  body.app-shell .dash-nav-item { min-width: 52px; padding-left: 5px; padding-right: 5px; }
+  body.app-shell .dash-nav-item::after { font-size: 9px; }
+}
+
+@media (max-width: 390px) {
+  body.app-shell .dash-content { padding-left: 14px; padding-right: 14px; }
+  body.app-shell .dash-nav-item { min-width: 48px; }
+  body.app-shell .dash-nav-item::after { font-size: 8.5px; }
+  body.page-porton .gate-btn-wrap { width: 176px; height: 176px; }
+}
