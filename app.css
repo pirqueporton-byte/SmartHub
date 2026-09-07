@@ -393,3 +393,170 @@ body.page-riego .panel-title { font-size: 18px; }
   body.app-shell .dash-nav-item::after { font-size: 8.5px; }
   body.page-porton .gate-btn-wrap { width: 176px; height: 176px; }
 }
+
+/* ==========================================================
+   RIEGO · AJUSTES DE COHERENCIA V2
+   ========================================================== */
+body.page-riego .header-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+}
+body.page-riego .header-actions .btn-icon {
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  padding: 0;
+  border-radius: 13px;
+}
+body.page-riego .header-actions .btn-icon svg {
+  width: 20px !important;
+  height: 20px;
+  display: block;
+}
+
+/* Dock discreto: ambas acciones pertenecen al mismo nivel jerárquico. */
+body.page-riego .floating-tools-container {
+  width: auto;
+  max-width: calc(100% - 28px);
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+body.page-riego .floating-tools-btn {
+  min-height: 40px;
+  padding: 9px 13px;
+  gap: 8px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--text-main);
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+body.page-riego .floating-tools-btn svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+}
+body.page-riego .floating-tools-btn:hover {
+  background: var(--bg);
+  transform: none;
+}
+body.page-riego .floating-tools-btn:active {
+  transform: scale(.98);
+}
+
+/* Ajustes de Riego */
+body.page-riego .riego-settings-card {
+  padding: 0;
+  overflow: hidden;
+  max-width: 430px;
+}
+body.page-riego .riego-settings-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 22px 18px;
+  border-bottom: 1px solid var(--border);
+}
+body.page-riego .riego-settings-header h3 {
+  margin: 0 0 5px;
+  font-size: 19px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -.3px;
+}
+body.page-riego .riego-settings-header p,
+body.page-riego .settings-section-help {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+body.page-riego .riego-settings-header .btn-close {
+  width: 34px;
+  height: 34px;
+  padding: 6px;
+  flex: 0 0 34px;
+}
+body.page-riego .settings-section {
+  padding: 20px 22px;
+}
+body.page-riego .settings-section + .settings-section {
+  border-top: 1px solid var(--border);
+}
+body.page-riego .settings-section-title {
+  margin-bottom: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main);
+  text-transform: uppercase;
+  letter-spacing: .55px;
+}
+body.page-riego .settings-section-help {
+  margin-bottom: 14px;
+}
+body.page-riego .settings-action-btn {
+  width: 100%;
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text-main);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: .2s ease;
+}
+body.page-riego .settings-action-btn:hover { background: var(--bg); }
+body.page-riego .settings-action-btn svg { width: 18px; height: 18px; }
+body.page-riego .settings-section-visual .form-group:last-child { margin-bottom: 0; }
+
+@media (max-width: 900px) {
+  body.page-riego .header-actions .btn-icon {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+  }
+  body.page-riego .floating-tools-container {
+    width: auto;
+    max-width: calc(100% - 18px);
+    bottom: 12px;
+    padding: 4px;
+  }
+  body.page-riego .floating-tools-btn {
+    flex: 0 1 auto;
+    padding: 9px 11px;
+    font-size: 11.5px;
+  }
+  body.page-riego .riego-settings-card {
+    width: calc(100% - 28px);
+    max-width: 430px;
+    border-radius: 20px;
+  }
+}
+
+@media (max-width: 390px) {
+  body.page-riego .floating-tools-btn {
+    gap: 6px;
+    padding-left: 9px;
+    padding-right: 9px;
+    font-size: 10.8px;
+  }
+  body.page-riego .floating-tools-btn svg { width: 16px; height: 16px; }
+}
