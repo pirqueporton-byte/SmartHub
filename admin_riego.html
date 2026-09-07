@@ -353,7 +353,13 @@
               <button class="btn-outline" style="width:auto; padding:0 14px; font-size:16px;" onclick="usarCuentagotas('z-color')" title="Clonar color">💧</button>
             </div>
           </div>
-          <button class="btn-outline zone-save-btn" onclick="guardarZona()">Guardar sector</button>
+          <div class="zone-actions-stack">
+            <button class="btn-outline zone-save-btn" onclick="guardarZona()">Guardar sector</button>
+            <button class="btn-outline zone-sync-btn" onclick="abrirSincronizacionSector()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7h-7a4 4 0 0 0-4 4v1"></path><path d="m17 4 3 3-3 3"></path><path d="M4 17h7a4 4 0 0 0 4-4v-1"></path><path d="m7 20-3-3 3-3"></path></svg>
+              Sincronizar programación
+            </button>
+          </div>
           <hr style="border:0; border-top:1px solid var(--border); width:100%; margin:20px 0;">
           <button class="btn-outline btn-danger" onclick="eliminarItem('zone')">Eliminar sector</button>
         </div>
@@ -476,6 +482,59 @@
       <div class="form-group"><label>Oscuridad exterior</label><input type="range" id="sl-dark" min="0" max="0.9" step="0.05" value="0.5" oninput="updateVisuals()"></div>
       <div class="form-group"><label>Transparencia de zonas</label><input type="range" id="sl-alpha" min="0.1" max="0.8" step="0.05" value="0.25" oninput="updateVisuals()"></div>
       <div class="form-group"><label>Grosor del perímetro</label><input type="range" id="sl-border" min="1" max="5" step="0.5" value="2.5" oninput="updateVisuals()"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DE SINCRONIZACIÓN DE SECTORES -->
+<div id="sync-modal" class="modal-backdrop">
+  <div class="modal-card sync-modal-card">
+    <div class="riego-settings-header">
+      <div>
+        <h3>Sincronizar sectores</h3>
+        <p>Crea una secuencia consecutiva a partir del sector actual.</p>
+      </div>
+      <button class="btn-close" onclick="cerrarSincronizacionSector()" aria-label="Cerrar sincronización">
+        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+
+    <div id="sync-source-card" class="sync-source-card"></div>
+
+    <div class="sync-config-grid">
+      <div class="form-group">
+        <label>Inicio del bloque</label>
+        <input type="time" id="sync-start-time" class="form-input" oninput="actualizarPreviewSincronizacion()">
+      </div>
+      <div class="form-group">
+        <label>Margen entre válvulas (min)</label>
+        <input type="number" id="sync-margin" class="form-input" min="0" max="30" step="1" value="1" oninput="actualizarPreviewSincronizacion()">
+      </div>
+    </div>
+    <p class="sync-help">Se conservan el nombre, electroválvula, GPIO, color y cantidad de aspersores de cada sector. Solo se sincronizan días, duración y horario.</p>
+
+    <div class="sync-target-header">
+      <div>
+        <strong>Sectores incluidos</strong>
+        <span>El orden se aplica por número de electroválvula.</span>
+      </div>
+      <div class="sync-select-actions">
+        <button type="button" onclick="marcarTodosSincronizacion(true)">Todos</button>
+        <button type="button" onclick="marcarTodosSincronizacion(false)">Ninguno</button>
+      </div>
+    </div>
+    <div id="sync-target-list" class="sync-target-list"></div>
+
+    <div class="sync-preview-section">
+      <div class="settings-section-title">Vista previa</div>
+      <div id="sync-preview" class="sync-preview"></div>
+    </div>
+
+    <div id="sync-conflicts" class="sync-conflicts" style="display:none;"></div>
+
+    <div class="sync-footer-actions">
+      <button type="button" class="btn-outline" onclick="cerrarSincronizacionSector()">Cancelar</button>
+      <button type="button" id="sync-apply-btn" class="btn-outline sync-apply-btn" onclick="aplicarSincronizacionSectores()">Aplicar secuencia</button>
     </div>
   </div>
 </div>
@@ -955,25 +1014,51 @@ function seleccionarPanel(type, id) {
   }
 }
 
-function validarSolapamiento(nuevaHora, nuevaDuracionMin, nuevosDias, idActual) {
+function horaAMinutos(hora) {
+  const [h, m] = String(hora || "00:00").split(':').map(Number);
+  return (h * 60) + m;
+}
+
+function minutosAHora(total) {
+  const t = Math.max(0, Math.min(1439, Math.round(total)));
+  return `${String(Math.floor(t / 60)).padStart(2,'0')}:${String(t % 60).padStart(2,'0')}`;
+}
+
+function getMargenSeguridadZona(z) {
+  const n = Number(z?.config?.margen_seguridad);
+  return Number.isFinite(n) && n >= 0 ? n : 1;
+}
+
+function compartenDias(diasA, diasB) {
+  if (!Array.isArray(diasA) || !Array.isArray(diasB)) return false;
+  return diasA.some(d => diasB.includes(d));
+}
+
+function rangosEnConflicto(inicioA, durA, margenA, inicioB, durB, margenB) {
+  const finProtegidoA = inicioA + Number(durA) + Number(margenA || 0);
+  const finProtegidoB = inicioB + Number(durB) + Number(margenB || 0);
+  return inicioA < finProtegidoB && inicioB < finProtegidoA;
+}
+
+function validarSolapamiento(nuevaHora, nuevaDuracionMin, nuevosDias, idActual, margenNuevo = 1) {
   if (!nuevosDias || nuevosDias.length === 0) return null;
-  const [nHora, nMin] = nuevaHora.split(':').map(Number);
-  const inicioNuevoMin = nHora * 60 + nMin;
-  const finNuevoMin = inicioNuevoMin + parseInt(nuevaDuracionMin);
+  const inicioNuevoMin = horaAMinutos(nuevaHora);
+
+  if (inicioNuevoMin + Number(nuevaDuracionMin) + Number(margenNuevo) > 1440) {
+    return "La programación supera la medianoche";
+  }
 
   for (let z of zones) {
     if (z.id === idActual) continue;
     if (!z.config || !z.config.hora || !z.config.duracion || !z.config.dias) continue;
+    if (!compartenDias(z.config.dias, nuevosDias)) continue;
 
-    const comparteDia = z.config.dias.some(dia => nuevosDias.includes(dia));
-    if (!comparteDia) continue;
-
-    const [zHora, zMin] = z.config.hora.split(':').map(Number);
-    const inicioZMin = zHora * 60 + zMin;
-    const finZMin = inicioZMin + parseInt(z.config.duracion);
-
-    if (inicioNuevoMin < finZMin && finNuevoMin > inicioZMin) {
-      return z.name || "Otro Sector";
+    const inicioZMin = horaAMinutos(z.config.hora);
+    if (rangosEnConflicto(
+      inicioNuevoMin, nuevaDuracionMin, margenNuevo,
+      inicioZMin, z.config.duracion, getMargenSeguridadZona(z)
+    )) {
+      return z.name || "Otro sector";
     }
   }
   return null;
@@ -984,7 +1069,7 @@ async function usarCuentagotas(inputId) {
   try { const ed = new EyeDropper(); const res = await ed.open(); document.getElementById(inputId).value = res.sRGBHex; } catch(e) {}
 }
 
-function guardarZona() { 
+function guardarZona(cerrarAlGuardar = true) { 
   const z = zones.find(x => x.id === selectedItem.id); 
   if(!z) return; 
 
@@ -995,7 +1080,8 @@ function guardarZona() {
   const duracion = document.getElementById('z-dur').value; 
   const color = document.getElementById('z-color').value; 
   const dias = []; 
-  document.querySelectorAll('.day-btn.active').forEach(btn => dias.push(btn.getAttribute('data-day'))); 
+  document.querySelectorAll('.day-btn.active').forEach(btn => dias.push(btn.getAttribute('data-day')));
+  const margenSeguridad = getMargenSeguridadZona(z); 
 
   if (!nombre) return mostrarToast("Asigna un nombre al sector.");
   if (!Number.isInteger(valvula) || valvula < 1 || valvula > 8) return mostrarToast("Selecciona una electroválvula válida.");
@@ -1006,7 +1092,7 @@ function guardarZona() {
 
   if(!hora || !duracion) return mostrarToast("Ingrese hora y duración válidas.");
 
-  const solapadoCon = validarSolapamiento(hora, duracion, dias, z.id);
+  const solapadoCon = validarSolapamiento(hora, duracion, dias, z.id, margenSeguridad);
   if (solapadoCon) {
     alert(`⚠️ Conflicto de horario: Este sector se cruza con "${solapadoCon}" en los días seleccionados.`);
     return;
@@ -1023,14 +1109,207 @@ function guardarZona() {
   z.config.hora = hora; 
   z.config.duracion = duracion; 
   z.config.color = color; 
-  z.config.dias = dias; 
+  z.config.dias = dias;
+  z.config.margen_seguridad = margenSeguridad;
 
   guardarTodoDB(); 
   actualizarSelectorSectoresManual();
   renderEstadoEnVivo();
-  renderSVG(); 
-  cerrarPanelLateral(); 
+  renderSVG();
+  if (cerrarAlGuardar) cerrarPanelLateral();
   mostrarToast(`${nombre} · Válvula ${valvula} guardado`);
+  return true;
+}
+
+
+let sincronizacionEstado = { sourceId: null, plan: [], conflicts: [] };
+
+function getZonaOrdenValvula(z) {
+  const idx = zones.findIndex(item => item.id === z.id);
+  return getZoneValve(z, idx) || 99;
+}
+
+function getNombreDias(dias) {
+  const nombres = {"0":"D", "1":"L", "2":"M", "3":"X", "4":"J", "5":"V", "6":"S"};
+  return (dias || []).map(d => nombres[String(d)] || d).join(' · ');
+}
+
+function abrirSincronizacionSector() {
+  const source = zones.find(z => z.id === selectedItem.id);
+  if (!source) return mostrarToast("Selecciona primero un sector.");
+  if (!source.config?.hora || !source.config?.duracion || !source.config?.dias?.length) {
+    return mostrarToast("Guarda primero los días, hora y duración del sector base.");
+  }
+
+  sincronizacionEstado.sourceId = source.id;
+  const modal = document.getElementById('sync-modal');
+  document.getElementById('sync-start-time').value = source.config.hora;
+  document.getElementById('sync-margin').value = getMargenSeguridadZona(source);
+
+  const valve = getZoneValve(source, zones.findIndex(z => z.id === source.id));
+  document.getElementById('sync-source-card').innerHTML = `
+    <div class="sync-source-icon">${valve || '—'}</div>
+    <div><span>Sector base</span><strong>${source.name || 'Sector'}</strong><small>Válvula ${valve || '—'} · ${source.config.duracion} min · ${getNombreDias(source.config.dias)}</small></div>`;
+
+  const list = document.getElementById('sync-target-list');
+  const others = zones.filter(z => z.id !== source.id).sort((a,b) => getZonaOrdenValvula(a) - getZonaOrdenValvula(b));
+  list.innerHTML = others.length ? others.map(z => {
+    const v = getZoneValve(z, zones.findIndex(x => x.id === z.id));
+    return `<label class="sync-target-item">
+      <input type="checkbox" class="sync-target-check" value="${z.id}" checked onchange="actualizarPreviewSincronizacion()">
+      <span class="sync-target-valve">V${v || '—'}</span>
+      <span class="sync-target-copy"><strong>${z.name || 'Sector'}</strong><small>Actual: ${z.config?.hora || 'Sin hora'} · ${z.config?.duracion || '—'} min</small></span>
+    </label>`;
+  }).join('') : '<div class="sync-empty">No hay otros sectores creados.</div>';
+
+  modal.classList.add('active');
+  actualizarPreviewSincronizacion();
+}
+
+function cerrarSincronizacionSector() {
+  document.getElementById('sync-modal').classList.remove('active');
+}
+
+function marcarTodosSincronizacion(valor) {
+  document.querySelectorAll('.sync-target-check').forEach(c => c.checked = valor);
+  actualizarPreviewSincronizacion();
+}
+
+function construirPlanSincronizacion(source, targetIds, horaInicio, margen) {
+  const seleccionadas = zones
+    .filter(z => targetIds.includes(z.id))
+    .sort((a,b) => getZonaOrdenValvula(a) - getZonaOrdenValvula(b));
+  const grupo = [source, ...seleccionadas];
+  const idsGrupo = new Set(grupo.map(z => z.id));
+  const inicioBase = horaAMinutos(horaInicio);
+  const duracion = Number(source.config.duracion);
+  const dias = [...(source.config.dias || [])];
+  const plan = [];
+  const conflicts = [];
+  let cursor = inicioBase;
+
+  for (const z of grupo) {
+    const fin = cursor + duracion;
+    if (fin + margen > 1440) {
+      conflicts.push({ type: 'midnight', zoneId: z.id, zoneName: z.name || 'Sector', message: `${z.name || 'Sector'} terminaría después de medianoche.` });
+      break;
+    }
+    plan.push({ zoneId: z.id, zoneName: z.name || 'Sector', hora: minutosAHora(cursor), inicio: cursor, duracion, dias, margen });
+    cursor = fin + margen;
+  }
+
+  if (!conflicts.length) {
+    const externas = zones.filter(z => !idsGrupo.has(z.id) && z.config?.hora && z.config?.duracion && z.config?.dias?.length);
+    for (const item of plan) {
+      for (const ext of externas) {
+        if (!compartenDias(item.dias, ext.config.dias)) continue;
+        const extInicio = horaAMinutos(ext.config.hora);
+        if (rangosEnConflicto(item.inicio, item.duracion, item.margen, extInicio, Number(ext.config.duracion), getMargenSeguridadZona(ext))) {
+          conflicts.push({
+            type: 'zone', zoneId: item.zoneId, zoneName: item.zoneName,
+            externalId: ext.id, externalName: ext.name || 'Sector',
+            message: `${item.zoneName} (${item.hora}–${minutosAHora(item.inicio + item.duracion)}) choca con ${ext.name || 'Sector'} (${ext.config.hora}–${minutosAHora(extInicio + Number(ext.config.duracion))}).`
+          });
+        }
+      }
+    }
+  }
+  return { plan, conflicts };
+}
+
+function actualizarPreviewSincronizacion() {
+  const source = zones.find(z => z.id === sincronizacionEstado.sourceId);
+  if (!source) return;
+  const targetIds = [...document.querySelectorAll('.sync-target-check:checked')].map(c => c.value);
+  const start = document.getElementById('sync-start-time').value || source.config.hora;
+  const margin = Math.max(0, Math.min(30, parseInt(document.getElementById('sync-margin').value || '1', 10)));
+  const result = construirPlanSincronizacion(source, targetIds, start, margin);
+  sincronizacionEstado.plan = result.plan;
+  sincronizacionEstado.conflicts = result.conflicts;
+
+  const preview = document.getElementById('sync-preview');
+  preview.innerHTML = result.plan.length ? result.plan.map((item, i) => {
+    const z = zones.find(x => x.id === item.zoneId);
+    const v = getZoneValve(z, zones.findIndex(x => x.id === item.zoneId));
+    const fin = minutosAHora(item.inicio + item.duracion);
+    return `<div class="sync-preview-row"><span class="sync-order">${i+1}</span><div><strong>${item.zoneName}</strong><small>Válvula ${v || '—'} · ${item.hora}–${fin}</small></div>${i < result.plan.length-1 ? `<span class="sync-gap">+${margin} min</span>` : ''}</div>`;
+  }).join('') : '<div class="sync-empty">Selecciona al menos un sector.</div>';
+
+  renderConflictosSincronizacion(result.conflicts);
+  document.getElementById('sync-apply-btn').disabled = result.conflicts.length > 0 || result.plan.length < 2;
+}
+
+function renderConflictosSincronizacion(conflicts) {
+  const box = document.getElementById('sync-conflicts');
+  if (!conflicts.length) {
+    box.style.display = 'none';
+    box.innerHTML = '';
+    return;
+  }
+  const uniqueExternal = [...new Set(conflicts.filter(c => c.externalId).map(c => c.externalId))];
+  box.style.display = 'block';
+  box.innerHTML = `<div class="sync-conflict-title">Conflictos detectados</div>
+    <div class="sync-conflict-list">${conflicts.map(c => `<div>${c.message}</div>`).join('')}</div>
+    <div class="sync-solution-title">Soluciones</div>
+    <div class="sync-solution-actions">
+      ${uniqueExternal.length ? `<button type="button" onclick="incluirConflictosEnSincronizacion()">Incluir sectores en conflicto</button>` : ''}
+      <button type="button" onclick="buscarSiguienteHorarioDisponible()">Mover al siguiente horario libre</button>
+    </div>`;
+}
+
+function incluirConflictosEnSincronizacion() {
+  const ids = new Set(sincronizacionEstado.conflicts.filter(c => c.externalId).map(c => c.externalId));
+  document.querySelectorAll('.sync-target-check').forEach(c => { if (ids.has(c.value)) c.checked = true; });
+  actualizarPreviewSincronizacion();
+}
+
+function buscarSiguienteHorarioDisponible() {
+  const source = zones.find(z => z.id === sincronizacionEstado.sourceId);
+  if (!source) return;
+  const targetIds = [...document.querySelectorAll('.sync-target-check:checked')].map(c => c.value);
+  const margin = Math.max(0, Math.min(30, parseInt(document.getElementById('sync-margin').value || '1', 10)));
+  const current = horaAMinutos(document.getElementById('sync-start-time').value || source.config.hora);
+
+  for (let candidate = current + 1; candidate < 1440; candidate++) {
+    const result = construirPlanSincronizacion(source, targetIds, minutosAHora(candidate), margin);
+    if (result.plan.length >= 2 && result.conflicts.length === 0) {
+      document.getElementById('sync-start-time').value = minutosAHora(candidate);
+      actualizarPreviewSincronizacion();
+      mostrarToast(`Horario libre encontrado: ${minutosAHora(candidate)}`);
+      return;
+    }
+  }
+  mostrarToast("No hay un bloque libre suficiente antes de medianoche.");
+}
+
+function aplicarSincronizacionSectores() {
+  if (!sincronizacionEstado.plan.length || sincronizacionEstado.conflicts.length) return;
+  const groupId = `sync_${Date.now()}`;
+  const source = zones.find(z => z.id === sincronizacionEstado.sourceId);
+  if (!source) return;
+
+  sincronizacionEstado.plan.forEach(item => {
+    const z = zones.find(x => x.id === item.zoneId);
+    if (!z) return;
+    if (!z.config) z.config = {};
+    z.config.hora = item.hora;
+    z.config.duracion = String(item.duracion);
+    z.config.dias = [...item.dias];
+    z.config.margen_seguridad = item.margen;
+    z.config.grupo_sincronizado = groupId;
+    z.config.sincronizado_desde = source.id;
+  });
+
+  guardarTodoDB();
+  const current = zones.find(z => z.id === selectedItem.id);
+  if (current) {
+    document.getElementById('z-hora').value = current.config.hora;
+    document.getElementById('z-dur').value = current.config.duracion;
+    document.querySelectorAll('.day-btn').forEach(btn => btn.classList.toggle('active', current.config.dias.includes(btn.getAttribute('data-day'))));
+  }
+  actualizarSelectorSectoresManual();
+  cerrarSincronizacionSector();
+  mostrarToast(`Secuencia aplicada a ${sincronizacionEstado.plan.length} sectores.`);
 }
 
 function guardarMarcador() { const m = markers.find(x => x.id === selectedItem.id); if(!m) return; m.name = document.getElementById('m-name').value; m.iconType = document.getElementById('m-icon').value; m.color = document.getElementById('m-color').value; m.scale = parseFloat(document.getElementById('m-scale').value); guardarTodoDB(); renderSVG(); mostrarToast("Icono Guardado"); cerrarPanelLateral(); }
