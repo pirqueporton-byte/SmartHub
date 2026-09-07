@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<title>Portón Pirque</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #EFF3EE; --surface: #FFFFFF; --border: #E4E7EB; --text-main: #111827; --text-muted: #6B7280; --success: #1E8E3E; --danger: #D93025; --primary: #0F172A;}
+  [data-theme="dark"] { --bg: #121418; --surface: #1E2128; --border: #2C303A; --text-main: #F3F4F6; --text-muted: #9CA3AF; --success: #1E8E3E; --danger: #D93025; --primary: #F8FAFC; }
+  [data-theme="grey"] { --bg: #202124; --surface: #292A2D; --border: #3C4043; --text-main: #E8EAED; --text-muted: #9AA0A6; --success: #81C995; --danger: #F28B82; --primary: #8AB4F8; }
+
+  * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--bg); color: var(--text-main); padding: 20px; transition: 0.3s; }
+  .user-card { background: var(--surface); width: 100%; max-width: 400px; border-radius: 24px; padding: 40px 24px; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.1); text-align: center; border: 1px solid var(--border); transition: 0.3s; }
+  
+  .gate-btn-wrap { position: relative; width: 200px; height: 200px; margin: 30px auto; }
+  .gate-btn { width: 100%; height: 100%; border-radius: 50%; border: none; background: radial-gradient(circle at 30% 30%, #3E8863, #1F4A32); color: white; cursor: pointer; box-shadow: inset 0 8px 18px rgba(0,0,0,.3), 0 10px 20px rgba(0,0,0,.2); transition: 0.1s; display: flex; align-items: center; justify-content: center; }
+  .gate-btn:active { transform: scale(0.95); }
+  .gate-btn:disabled { filter: grayscale(1); cursor: not-allowed; }
+  .gate-btn svg { width: 50px; height: 50px; opacity: 0.9; }
+  
+  .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 20px; letter-spacing: 0.5px; }
+  .status-online { background: rgba(30, 142, 62, 0.15); color: var(--success); }
+  .status-offline { background: rgba(217, 48, 37, 0.15); color: var(--danger); }
+  .status-connecting { background: var(--border); color: var(--text-muted); }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+
+  .btn-outline-gen { background: transparent; border: 1px solid var(--border); padding: 12px; border-radius: 12px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text-main); display: inline-flex; align-items: center; justify-content: center; width: 100%; transition: 0.2s; margin-top: 10px; }
+  .btn-outline-gen:hover { background: var(--bg); }
+  
+  .toast { position: fixed; bottom: 30px; left: 50%; transform: translate(-50%, 20px); background: #323232; color: #fff; padding: 12px 24px; border-radius: 99px; font-size: 13px; font-weight: 600; opacity: 0; transition: 0.3s; pointer-events: none; z-index: 9999; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body data-theme="dark">
+
+<div class="user-card" id="vista-autorizado" style="display:none;">
+  <div class="status-badge status-connecting"><span class="status-dot"></span><span class="conexion-text">Conectando...</span></div>
+  
+  <div class="gate-btn-wrap">
+    <button class="gate-btn gate-action-btn" onclick="abrirPorton()" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 15v2"></path><path d="M6 10V7a6 6 0 0 1 11.3-2.8"></path><rect x="5" y="10" width="14" height="11" rx="2"></rect></svg>
+    </button>
+  </div>
+  
+  <div id="user-info-normal" style="font-weight:700; margin-bottom:20px; font-size: 18px;"></div>
+  <button class="btn-outline-gen" onclick="cerrarSesion()">Cerrar sesión</button>
+</div>
+
+<div id="toast" class="toast">Mensaje</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+<script>
+// Motor de Temas
+function aplicarTema(tema) {
+  if (tema === 'light') document.body.removeAttribute('data-theme');
+  else document.body.setAttribute('data-theme', tema);
+  localStorage.setItem('riegoTheme', tema);
+}
+aplicarTema(localStorage.getItem('riegoTheme') || 'dark');
+
+const firebaseConfig = { apiKey: "AIzaSyCABy9Rpn1wc1gYBzDEm8Mf05x0gu9lpyQ", authDomain: "portonpirque.firebaseapp.com", databaseURL: "https://portonpique-default-rtdb.firebaseio.com/", projectId: "portonpirque" };
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database(); const auth = firebase.auth(); const ADMIN_EMAIL = "pirqueporton@gmail.com";
+let currentUser = null; let ultimoLatido = 0; let serverTimeOffset = 0;
+
+function mostrarToast(msg) {
+  const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+auth.onAuthStateChanged((user) => {
+    if(user) {
+        if(user.email === ADMIN_EMAIL) { window.location.href = 'admin_inicio.html'; } 
+        else {
+            db.ref(`lista_blanca/${user.uid}`).once('value').then((snap) => {
+                if(snap.exists()) {
+                    currentUser = user;
+                    document.getElementById('vista-autorizado').style.display = 'block';
+                    document.getElementById('user-info-normal').textContent = 'Hola, ' + snap.val().nombre;
+                    iniciarMonitoreo();
+                } else { auth.signOut().then(() => window.location.href = 'index.html'); }
+            });
+        }
+    } else { window.location.href = 'index.html'; }
+});
+
+function cerrarSesion() { auth.signOut().then(() => window.location.href = 'index.html'); }
+
+function setEstadoConexion(estado) {
+  const isOnline = (estado === 'online');
+  document.querySelector('.conexion-text').textContent = isOnline ? 'En línea' : 'Fuera de línea';
+  document.querySelector('.gate-action-btn').disabled = !isOnline;
+  document.querySelector('.status-badge').className = 'status-badge ' + (isOnline ? 'status-online' : 'status-offline');
+}
+
+function iniciarMonitoreo() {
+  db.ref('.info/serverTimeOffset').on('value', snap => serverTimeOffset = snap.val() || 0);
+  db.ref('estado_porton/ultima_conexion').on('value', snap => { if(snap.exists()) ultimoLatido = snap.val(); });
+  setInterval(() => {
+    const dif = ((Date.now() + serverTimeOffset) - ultimoLatido) / 1000;
+    setEstadoConexion(dif > 30 ? 'offline' : 'online');
+  }, 1000);
+}
+
+function abrirPorton() {
+  document.querySelector('.conexion-text').textContent = 'Enviando orden...';
+  db.ref('estado_porton').update({ comando: 'abrir_' + Date.now(), timestamp: firebase.database.ServerValue.TIMESTAMP })
+    .then(() => {
+      mostrarToast('Apertura solicitada con éxito');
+      db.ref('historial').push({ fecha: new Date().toLocaleString('es-CL'), usuario: (currentUser.displayName || currentUser.email) });
+      setTimeout(() => setEstadoConexion('online'), 2000);
+    });
+}
+</script>
+</body>
+</html>
