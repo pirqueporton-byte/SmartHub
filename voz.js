@@ -603,22 +603,27 @@
     console.log('María procesa:', t);
 
     try {
-      if (responderAyuda(t)) return;
-      if (responderNavegacion(t)) return;
-
-      // Acciones se evalúan antes que consultas para reconocer frases como
-      // "riega el sector 2 por 15 minutos".
+      // Los comandos críticos más simples siguen locales: son rápidos y funcionan
+      // incluso si el servicio de IA no está disponible.
       if (await responderPorton(t)) return;
       if (await ejecutarRiegoManual(t)) return;
+
+      // Para todo lo demás, María IA entiende lenguaje natural y decide qué
+      // herramientas consultar. Esto evita mantener cientos de frases exactas.
+      if (window.MariaAI?.disponible?.()) {
+        actualizarUI('hablando', 'María · pensando');
+        const respuestaIA = await window.MariaAI.procesar(t);
+        hablarRespuesta(respuestaIA, { contexto: { tipo: 'ia' }, ms: 28000 });
+        return;
+      }
+
+      // Modo de respaldo mientras el Worker todavía no haya sido configurado.
+      if (responderAyuda(t)) return;
+      if (responderNavegacion(t)) return;
       if (await responderClima(t)) return;
       if (await responderRiego(t)) return;
 
-      // Seguimiento de clima breve: "¿y mañana?", "¿y en Santiago?".
-      if (MARIA.lastContext?.tipo === 'clima' && contiene(t, ['manana', 'hoy', 'santiago', 'pirque', 'ciudad', 'comuna'])) {
-        if (await responderClima(`clima ${t}`)) return;
-      }
-
-      hablarRespuesta('No encontré una respuesta para eso todavía. Puedes preguntarme por riego, clima, portón o decirme qué quieres controlar.', { contexto: MARIA.lastContext });
+      hablarRespuesta('La inteligencia artificial todavía no está conectada. Puedo seguir usando las funciones locales de riego, clima y portón.', { contexto: MARIA.lastContext });
     } catch (err) {
       console.error('Error procesando voz:', err);
       hablarRespuesta('Tuve un problema al consultar el sistema. Revisa la conexión e inténtalo de nuevo.', { contexto: MARIA.lastContext });

@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "smarthub-maria-ai",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "vars": {
+    "ALLOWED_ORIGINS": "https://pirqueporton-byte.github.io",
+    "ALLOW_LOCALHOST": "true",
+    "FIREBASE_WEB_API_KEY": "AIzaSyCABy9Rpn1wc1gYBzDEm8Mf05x0gu9lpyQ",
+    "ALLOWED_EMAILS": "pirqueporton@gmail.com",
+    "ANTHROPIC_MODEL": "claude-sonnet-5"
+  }
+}
