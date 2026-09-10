@@ -104,6 +104,7 @@
       if (MARIA.listening && !MARIA.blocked && !MARIA.suspended) {
         MARIA.listening = false;
         suspenderVoz();
+        MARIA.suspended = document.hidden;
         actualizarUI('inactivo', 'María · activar micrófono');
       } else {
         MARIA.blocked = false;
