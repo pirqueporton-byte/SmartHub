@@ -931,3 +931,34 @@ body.page-inicio .home-system-card-disabled .home-card-footer {
     padding-top: 15px;
   }
 }
+
+/* Geometría móvil compartida por los tres temas, incluida el área de gestos. */
+@media (max-width: 900px) {
+  body.app-shell { --app-nav-total: calc(var(--app-nav-mobile) + env(safe-area-inset-bottom, 0px)); }
+  body.app-shell .dash-sidebar { height: var(--app-nav-total); box-sizing: border-box; }
+  body.app-shell .dash-content { padding-bottom: calc(var(--app-nav-total) + 18px); }
+  body.app-shell.page-riego .dash-content {
+    box-sizing: border-box;
+    height: calc(100dvh - var(--app-nav-total));
+    padding: max(16px, env(safe-area-inset-top, 0px)) 14px 12px;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  body.page-riego .riego-header-bar { flex-shrink: 0; }
+  body.page-riego .riego-layout { flex: 1 0 180px; min-height: 180px; }
+  body.page-riego .side-panel {
+    bottom: var(--app-nav-total) !important;
+    max-height: calc(100dvh - var(--app-nav-total) - 24px);
+  }
+  body.app-shell #maria-voice-status { bottom: calc(var(--app-nav-total) + 8px); }
+  body.app-shell #maria-chat-launcher { bottom: calc(var(--app-nav-total) + 50px); }
+  body.app-shell #maria-chat-panel {
+    min-height: 0;
+    top: auto;
+    bottom: calc(var(--app-nav-total) + 108px);
+    height: min(610px, calc(100dvh - var(--app-nav-total) - 124px));
+  }
+  /* Espacio propio para los accesos de María debajo del mapa. */
+  body.app-shell.page-riego .dash-content { padding-bottom: 112px; }
+}

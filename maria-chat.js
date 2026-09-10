@@ -228,11 +228,7 @@
         speak.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18 6a8.5 8.5 0 0 1 0 12"/></svg> Escuchar`;
         speak.addEventListener('click', () => {
           try {
-            speechSynthesis.cancel();
-            const u = new SpeechSynthesisUtterance(text);
-            u.lang = 'es-CL';
-            u.rate = 1.02;
-            speechSynthesis.speak(u);
+            if (window.hablarRespuesta) window.hablarRespuesta(text, { seguir: false });
           } catch (_) {}
         });
         tools.appendChild(speak);

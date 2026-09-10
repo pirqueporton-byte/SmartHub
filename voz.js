@@ -14,8 +14,15 @@
 
   const MARIA = {
     recognition: null,
-    listening: false,
+    listening: true,
     speaking: false,
+    active: false,
+    starting: false,
+    suspended: document.hidden,
+    blocked: false,
+    speechId: 0,
+    speechTimer: null,
+    releaseAudio: null,
     conversationUntil: 0,
     conversationMs: 18000,
     lastContext: null,
@@ -78,7 +85,7 @@
 
     const style = document.createElement('style');
     style.textContent = `
-      #maria-voice-status{position:fixed;right:18px;bottom:18px;z-index:99999;display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:999px;background:rgba(20,24,31,.82);color:#fff;border:1px solid rgba(255,255,255,.12);box-shadow:0 10px 30px rgba(0,0,0,.2);font:600 12px/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);opacity:.78;transition:.2s ease;pointer-events:none}
+      #maria-voice-status{position:fixed;right:18px;bottom:18px;z-index:99999;display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:999px;background:rgba(20,24,31,.82);color:#fff;border:1px solid rgba(255,255,255,.12);box-shadow:0 10px 30px rgba(0,0,0,.2);font:600 12px/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);opacity:.78;transition:.2s ease;pointer-events:auto;cursor:pointer}
       #maria-voice-status .maria-dot{width:8px;height:8px;border-radius:50%;background:#7f8c98;box-shadow:0 0 0 0 rgba(80,200,255,0)}
       #maria-voice-status[data-state="escuchando"] .maria-dot{background:#55d68b}
       #maria-voice-status[data-state="conversando"]{opacity:1;border-color:rgba(80,200,255,.35)}
@@ -90,7 +97,23 @@
     `;
     document.head.appendChild(style);
 
-    const el = document.createElement('div');
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.title = 'Pausar o reactivar el micrófono';
+    el.addEventListener('click', () => {
+      if (MARIA.listening && !MARIA.blocked && !MARIA.suspended) {
+        MARIA.listening = false;
+        suspenderVoz();
+        MARIA.suspended = document.hidden;
+        actualizarUI('inactivo', 'María · activar micrófono');
+      } else {
+        MARIA.blocked = false;
+        MARIA.listening = true;
+        MARIA.suspended = false;
+        iniciarAsistenteMaria();
+        reanudarReconocimiento(0);
+      }
+    });
     el.id = 'maria-voice-status';
     el.dataset.state = 'inactivo';
     el.innerHTML = '<span class="maria-dot"></span><span class="maria-label">María · iniciando</span>';
@@ -112,48 +135,112 @@
     if (label) label.textContent = texto || etiquetas[estado] || 'María';
   }
 
+  // Esperar onend evita mantener la captura activa al reproducir una respuesta.
   function detenerReconocimientoTemporalmente() {
-    if (!MARIA.recognition) return;
-    try { MARIA.recognition.stop(); } catch (_) {}
+    clearTimeout(MARIA.restartTimer);
+    return new Promise(resolve => {
+      if (!MARIA.recognition || (!MARIA.active && !MARIA.starting)) {
+        resolve();
+        return;
+      }
+      MARIA.releaseAudio = resolve;
+      try { MARIA.recognition.abort(); } catch (_) { resolve(); }
+    });
   }
 
   function reanudarReconocimiento(delay = 350) {
-    if (!MARIA.listening || !MARIA.recognition || MARIA.speaking) return;
     clearTimeout(MARIA.restartTimer);
+    if (!MARIA.listening || MARIA.blocked || MARIA.suspended || document.hidden || MARIA.speaking) return;
     MARIA.restartTimer = setTimeout(() => {
-      try { MARIA.recognition.start(); } catch (_) {}
+      if (!MARIA.listening || MARIA.blocked || MARIA.suspended || document.hidden || MARIA.speaking || MARIA.active || MARIA.starting) return;
+      if (!MARIA.recognition) iniciarAsistenteMaria();
+      if (!MARIA.recognition) return;
+      try {
+        MARIA.starting = true;
+        MARIA.recognition.start();
+      } catch (error) {
+        MARIA.starting = false;
+        actualizarUI('error', 'María · toca para reactivar');
+        MARIA.listening = false;
+      }
     }, delay);
   }
 
-  function hablarRespuesta(mensaje, opciones = {}) {
+  function suspenderVoz() {
+    MARIA.suspended = true;
+    MARIA.speechId++;
+    clearTimeout(MARIA.restartTimer);
+    clearTimeout(MARIA.speechTimer);
+    MARIA.speaking = false;
+    MARIA.conversationUntil = 0;
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    const old = MARIA.recognition;
+    MARIA.recognition = null;
+    MARIA.active = MARIA.starting = false;
+    if (MARIA.releaseAudio) { MARIA.releaseAudio(); MARIA.releaseAudio = null; }
+    if (old) {
+      old.onresult = old.onend = old.onerror = old.onstart = null;
+      try { old.abort(); } catch (_) {}
+    }
+    actualizarUI('inactivo', 'María · en pausa');
+  }
+
+  function recuperarVoz() {
+    if (document.hidden || !MARIA.suspended) return;
+    MARIA.suspended = false;
+    if (!MARIA.listening || MARIA.blocked) return;
+    iniciarAsistenteMaria();
+    reanudarReconocimiento(300);
+  }
+
+  async function hablarRespuesta(mensaje, opciones = {}) {
     const texto = String(mensaje || '').trim();
-    if (!texto) return;
-
-    console.log('María responde:', texto);
+    if (!texto || document.hidden || MARIA.suspended || !('speechSynthesis' in window)) return;
     if (opciones.contexto) MARIA.lastContext = opciones.contexto;
-    if (opciones.seguir !== false) abrirConversacion(opciones.ms || MARIA.conversationMs);
-
-    if (!('speechSynthesis' in window)) return;
-
-    window.speechSynthesis.cancel();
+    const id = ++MARIA.speechId;
+    clearTimeout(MARIA.speechTimer);
     MARIA.speaking = true;
+    window.speechSynthesis.cancel();
     actualizarUI('hablando');
-    detenerReconocimientoTemporalmente();
-
+    // Una captura que no termina no debe bloquear el asistente indefinidamente.
+    let releaseTimeout;
+    await Promise.race([
+      detenerReconocimientoTemporalmente(),
+      new Promise(resolve => { releaseTimeout = setTimeout(resolve, 1500); })
+    ]);
+    clearTimeout(releaseTimeout);
+    if (id !== MARIA.speechId || document.hidden) return;
+    if (MARIA.active || MARIA.starting) {
+      suspenderVoz();
+      actualizarUI('error', 'María · toca para reactivar');
+      return;
+    }
     const utterance = new SpeechSynthesisUtterance(texto);
     utterance.lang = 'es-CL';
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    utterance.onend = () => {
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    const finish = (error) => {
+      if (id !== MARIA.speechId) return;
+      clearTimeout(MARIA.speechTimer);
       MARIA.speaking = false;
-      actualizarUI(ahoraConversando() ? 'conversando' : 'escuchando');
-      reanudarReconocimiento(250);
+      if (opciones.seguir !== false) abrirConversacion(opciones.ms || MARIA.conversationMs);
+      actualizarUI(error ? 'error' : (MARIA.listening ? 'escuchando' : 'inactivo'),
+        error ? 'María · toca para reactivar' : '');
+      // Deja que el móvil libere la salida antes de volver a capturar audio.
+      reanudarReconocimiento(900);
     };
-    utterance.onerror = () => {
-      MARIA.speaking = false;
-      reanudarReconocimiento(250);
-    };
-    window.speechSynthesis.speak(utterance);
+    utterance.onend = () => finish(false);
+    utterance.onerror = () => finish(true);
+    MARIA.speechTimer = setTimeout(() => {
+      if (id !== MARIA.speechId) return;
+      window.speechSynthesis.cancel();
+      finish(true);
+    }, Math.max(30000, texto.length * 150));
+    try {
+      window.speechSynthesis.resume();
+      window.speechSynthesis.speak(utterance);
+    } catch (_) { finish(true); }
   }
 
   // Exponemos la función porque el código anterior ya la utilizaba.
@@ -642,7 +729,7 @@
       return;
     }
 
-    if (MARIA.recognition) return;
+    if (MARIA.recognition || !MARIA.listening || document.hidden || MARIA.suspended || MARIA.blocked) return;
 
     const recognition = new SpeechRecognition();
     recognition.lang = 'es-CL';
@@ -651,8 +738,13 @@
     recognition.maxAlternatives = 1;
     MARIA.recognition = recognition;
 
+    recognition.onstart = () => {
+      MARIA.starting = false;
+      MARIA.active = true;
+      actualizarUI('escuchando');
+    };
     recognition.onresult = (event) => {
-      if (MARIA.speaking) return;
+      if (MARIA.speaking || MARIA.suspended || document.hidden || !MARIA.listening) return;
       const frase = event.results[event.results.length - 1][0].transcript.trim();
       const norm = normalizar(frase);
       const now = Date.now();
@@ -686,26 +778,29 @@
       }
       if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
         MARIA.listening = false;
-        actualizarUI('error', 'María · activa el micrófono');
+        MARIA.blocked = true;
+        clearTimeout(MARIA.restartTimer);
+        actualizarUI('error', 'María · toca para activar micrófono');
       }
     };
 
     recognition.onend = () => {
-      if (MARIA.listening && !MARIA.speaking) reanudarReconocimiento(300);
+      MARIA.active = MARIA.starting = false;
+      if (MARIA.releaseAudio) { MARIA.releaseAudio(); MARIA.releaseAudio = null; }
+      if (MARIA.listening && !MARIA.speaking) reanudarReconocimiento(600);
     };
 
     MARIA.listening = true;
-    actualizarUI('escuchando');
-    try {
-      recognition.start();
-      console.log("Asistente 'María' activo y escuchando...");
-    } catch (e) {
-      console.warn('No se pudo iniciar el reconocimiento automáticamente:', e);
-      reanudarReconocimiento(700);
-    }
+    reanudarReconocimiento(0);
   }
 
   window.iniciarAsistenteMaria = iniciarAsistenteMaria;
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) suspenderVoz(); else recuperarVoz();
+  });
+  window.addEventListener('pagehide', suspenderVoz);
+  window.addEventListener('pageshow', recuperarVoz);
 
   window.addEventListener('DOMContentLoaded', () => {
     crearUI();
