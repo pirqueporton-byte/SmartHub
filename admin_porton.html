@@ -106,6 +106,8 @@
   }
 </style>
 <link rel="stylesheet" href="app.css?v=20260910-1">
+<link rel="stylesheet" href="view-mode.css?v=20260911-1">
+<script src="view-mode.js?v=20260911-1"></script>
 </head>
 <body data-theme="dark" class="app-shell page-porton">
 
@@ -284,7 +286,11 @@ function mostrarToast(msg) {
 
 auth.onAuthStateChanged((user) => {
     if(!user || user.email !== ADMIN_EMAIL) window.location.href = 'index.html';
-    else { currentUser = user; iniciarDatos(); }
+    else {
+      if (SmartHubView.route(user)) return;
+      SmartHubView.mount(user, '.header-actions');
+      currentUser = user; iniciarDatos();
+    }
 });
 function cerrarSesion() { auth.signOut().then(() => window.location.href = 'index.html'); }
 
@@ -334,3 +340,4 @@ function activarEmparejamiento() { db.ref('estado_porton').update({ comando: 'em
 </script>
 </body>
 </html>
+
