@@ -22,3 +22,20 @@ body.view-celular{min-height:100dvh}
 @media(max-width:600px){.home-view-actions{justify-content:flex-start}.home-header:has(.home-view-actions){flex-wrap:wrap}.view-mode-dialog{padding:20px}.view-mode-heading h2{font-size:19px}}
 @media(max-width:340px){.view-mode-options{grid-template-columns:1fr}.view-mode-options button{padding:14px}}
 @media(max-width:900px){.header-actions .view-mode-trigger{width:42px;padding:10px}.header-actions .view-mode-trigger span{display:none}}
+
+/* Acceso directo: controles en la cabecera, sin barra de navegación. */
+.mobile-gate-tools{display:none}
+body.app-shell.page-porton.view-celular{--app-nav-mobile:0px;--app-nav-total:0px}
+body.app-shell.page-porton.view-celular .dash-sidebar{display:none}
+body.page-porton.view-celular .mobile-gate-tools{display:flex;align-items:center;gap:8px}
+.mobile-gate-tool{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:42px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text-main);font:600 12px/1.2 system-ui,sans-serif;cursor:pointer}
+.mobile-gate-tool svg{width:18px;height:18px}
+.mobile-gate-tool:hover{background:var(--bg)}
+.mobile-gate-tool:focus-visible{outline:3px solid #4d99db;outline-offset:3px}
+body.page-porton.view-celular .header-actions{display:flex;flex-wrap:wrap;gap:8px}
+body.app-shell.page-porton.view-celular .dash-content{padding-bottom:110px}
+@media(max-width:900px){
+  body.app-shell.page-porton.view-celular .header-bar{flex-direction:column;align-items:flex-start;gap:14px}
+  body.page-porton.view-celular .header-actions{width:100%;justify-content:flex-end}
+  body.page-porton.view-celular .mobile-gate-tools{margin-right:auto}
+}
