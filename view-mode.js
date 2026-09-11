@@ -21,14 +21,15 @@
     } catch (_) { return false; }
   }
   function home(user) {
-    return user?.email === ADMIN && get(user) === 'tablet' ? 'admin_inicio.html' : 'usuario.html';
+    if (user?.email !== ADMIN) return 'usuario.html';
+    return get(user) === 'celular' ? 'admin_porton.html' : 'admin_inicio.html';
   }
   // Llamar solo después de que cada página haya validado la cuenta.
   function route(user) {
     if (!user?.uid || user.email !== ADMIN) return false;
     const mobile = get(user) === 'celular';
-    if ((mobile && ['admin_inicio.html','admin_porton.html','admin_riego.html'].includes(page())) ||
-        (!mobile && page() === 'usuario.html')) {
+    if ((mobile && ['admin_inicio.html','admin_riego.html'].includes(page())) ||
+        page() === 'usuario.html') {
       window.location.replace(home(user));
       return true;
     }

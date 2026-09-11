@@ -20,14 +20,14 @@ function environment(store = new Map(), pathname = '/SmartHub/index.html') {
 const e=environment();
 assert.equal(e.api.home(admin),'admin_inicio.html');
 assert.equal(e.api.save(admin,'celular'),true);
-assert.equal(e.api.home(admin),'usuario.html');
+assert.equal(e.api.home(admin),'admin_porton.html');
 assert.equal(e.api.get(member),'tablet');
-assert.equal(environment(e.store).api.home(admin),'usuario.html','choice survives fresh page context');
+assert.equal(environment(e.store).api.home(admin),'admin_porton.html','choice survives fresh page context');
 assert.equal(environment().api.home(admin),'admin_inicio.html','another device keeps default');
-for(const pathname of ['admin_inicio.html','admin_porton.html','admin_riego.html']) {
- const ctx=environment(e.store,'/SmartHub/'+pathname);assert.equal(ctx.api.route(admin),true);assert.deepEqual(ctx.redirects,['usuario.html']);
+for(const pathname of ['admin_inicio.html','usuario.html','admin_riego.html']) {
+ const ctx=environment(e.store,'/SmartHub/'+pathname);assert.equal(ctx.api.route(admin),true);assert.deepEqual(ctx.redirects,['admin_porton.html']);
 }
-assert.equal(environment(e.store,'/SmartHub/usuario.html').api.route(admin),false,'no mobile redirect loop');
+assert.equal(environment(e.store,'/SmartHub/admin_porton.html').api.route(admin),false,'no mobile redirect loop');
 e.api.save(admin,'tablet');
 assert.equal(environment(e.store,'/SmartHub/usuario.html').api.route(admin),true);
 for(const mode of ['tablet','celular']) {e.api.save(member,mode);assert.equal(e.api.home(member),'usuario.html','member never gets admin dashboard');}
@@ -52,8 +52,8 @@ async function checkAuth(name,user,allowed,mobile) {
   const denied=await checkAuth(file,member,false,true);assert.equal(denied.signouts,1);assert(!denied.redirects.includes('admin_inicio.html'));
   const allowed=await checkAuth(file,member,true,true);assert.equal(allowed.checks,1);assert.equal(allowed.signouts,0);
  }
- const quick=await checkAuth('usuario.html',admin,true,true);assert.equal(quick.nodes.get('vista-autorizado').style.display,'block');assert.equal(quick.redirects.length,0);
+ const quick=await checkAuth('usuario.html',admin,true,true);assert.deepEqual(quick.redirects,['admin_porton.html']);
  const standard=await checkAuth('usuario.html',admin,true,false);assert.deepEqual(standard.redirects,['admin_inicio.html']);
- const login=await checkAuth('index.html',admin,true,true);assert.deepEqual(login.redirects,['usuario.html']);
+ const login=await checkAuth('index.html',admin,true,true);assert.deepEqual(login.redirects,['admin_porton.html']);
  console.log('PASS: persisted choice, separate users/devices, launch routing, no loops, return to tablet, storage failure, whitelist denial, admin access to mobile gate. No Firebase writes.');
 })().catch(err=>{console.error(err);process.exit(1)});
