@@ -214,6 +214,8 @@
   .toast.show { opacity: 1; transform: translate(-50%, 0); }
 </style>
 <link rel="stylesheet" href="app.css?v=20260910-1">
+<link rel="stylesheet" href="view-mode.css?v=20260911-1">
+<script src="view-mode.js?v=20260911-1"></script>
 </head>
 <body data-theme="dark" class="app-shell page-riego">
 
@@ -713,6 +715,8 @@ const auth = firebase.auth(); const db = firebase.database(); const ADMIN_EMAIL 
 auth.onAuthStateChanged((user) => {
   if(!user || user.email !== ADMIN_EMAIL) window.location.href = 'index.html';
   else {
+    if (SmartHubView.route(user)) return;
+    SmartHubView.mount(user, '.header-actions');
     loadVisuals();
     db.ref('modulo_riego').once('value').then(snap => {
       const data = snap.val() || {};
@@ -1448,3 +1452,4 @@ function actualizarSelectorSectoresManual() {
 </script>
 </body>
 </html>
+

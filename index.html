@@ -20,6 +20,8 @@
   .loader { border: 3px solid var(--border); border-top: 3px solid var(--primary); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 0 auto; display: none; }
   @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 </style>
+<link rel="stylesheet" href="view-mode.css?v=20260911-1">
+<script src="view-mode.js?v=20260911-1"></script>
 </head>
 <body data-theme="dark">
 
@@ -65,10 +67,10 @@ function showError(msg) {
     mostrarCarga(false);
 }
 function redireccionar(user) {
-    if (user.email === ADMIN_EMAIL) { window.location.href = 'admin_inicio.html'; } 
+    if (user.email === ADMIN_EMAIL) { window.location.replace(SmartHubView.home(user)); } 
     else {
         db.ref(`lista_blanca/${user.uid}`).once('value').then((snap) => {
-            if(snap.exists()) { window.location.href = 'usuario.html'; } 
+            if(snap.exists()) { window.location.replace(SmartHubView.home(user)); } 
             else { showError('Tu cuenta no está autorizada.'); auth.signOut(); }
         }).catch(e => showError('Error al verificar permisos.'));
     }

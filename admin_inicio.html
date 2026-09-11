@@ -53,6 +53,8 @@
   }
 </style>
 <link rel="stylesheet" href="app.css?v=20260910-1">
+<link rel="stylesheet" href="view-mode.css?v=20260911-1">
+<script src="view-mode.js?v=20260911-1"></script>
 </head>
 <body data-theme="dark" class="app-shell page-inicio">
 
@@ -103,10 +105,10 @@
       <h1 class="dash-title">Inicio</h1>
       <p class="dash-subtitle">Control general del sistema</p>
     </div>
-    <div class="home-header-status" aria-label="Panel de administración">
+    <div class="home-view-actions" id="home-view-actions"><div class="home-header-status" aria-label="Panel de administración">
       <span class="home-header-status-dot"></span>
       Administrador
-    </div>
+    </div></div>
   </div>
 
   <section class="home-section" aria-labelledby="home-systems-title">
@@ -237,6 +239,8 @@ const auth = firebase.auth(); const db = firebase.database(); const ADMIN_EMAIL 
 auth.onAuthStateChanged((user) => {
     if(!user || user.email !== ADMIN_EMAIL) window.location.href = 'index.html';
     else {
+      if (SmartHubView.route(user)) return;
+      SmartHubView.mount(user, '#home-view-actions');
       let ultimoLatido = 0; let serverTimeOffset = 0;
       db.ref('.info/serverTimeOffset').on('value', snap => serverTimeOffset = snap.val() || 0);
       db.ref('estado_porton/ultima_conexion').on('value', snap => { if(snap.exists()) ultimoLatido = snap.val(); });
@@ -251,3 +255,4 @@ function cerrarSesion() { auth.signOut().then(() => window.location.href = 'inde
 </script>
 </body>
 </html>
+
