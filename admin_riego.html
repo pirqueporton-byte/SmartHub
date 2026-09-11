@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 21035)
+Total output lines: 1456
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -574,49 +577,16 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <script src="maria-config.js"></script>
-<script src="maria-ai.js"></script>
-<script src="voz.js?v=20260910-1"></script>
-<script src="maria-chat.js?v=20260910-1"></script>
+<script src="assistant-settings.js?v=20260911-1"></script>
+<script src="maria-ai.js?v=20260911-1"></script>
+<script src="voz.js?v=20260911-2"></script>
+<script src="maria-chat.js?v=20260911-2"></script>
 
 <script>
 function aplicarTema(tema) {
   if (tema === 'light') document.body.removeAttribute('data-theme'); else document.body.setAttribute('data-theme', tema);
   localStorage.setItem('riegoTheme', tema);
-  const svgLight = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>';
-  const svgGrey = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a10 10 0 0 0 0 20z" fill="currentColor"></path></svg>';
-  const svgDark = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
-  let svgStr = svgDark; let txt = 'Oscuro';
-  if(tema === 'light') { svgStr = svgLight; txt = 'Claro'; } else if(tema === 'grey') { svgStr = svgGrey; txt = 'Gris'; }
-  document.querySelectorAll('.theme-btn-icon').forEach(btn => { if(btn.querySelector('span')) btn.innerHTML = `${svgStr} <span>${txt}</span>`; else btn.innerHTML = svgStr; });
-}
-function ciclarTema() { let act = localStorage.getItem('riegoTheme') || 'dark'; aplicarTema(act === 'dark' ? 'grey' : (act === 'grey' ? 'light' : 'dark')); }
-aplicarTema(localStorage.getItem('riegoTheme') || 'dark');
-
-let vis = { extDark: 0.5, zoneAlpha: 0.25, borderW: 2.5 };
-function loadVisuals() { const v = JSON.parse(localStorage.getItem('riegoVis') || 'null'); if(v) vis = {...vis, ...v}; document.getElementById('sl-dark').value = vis.extDark; document.getElementById('sl-alpha').value = vis.zoneAlpha; document.getElementById('sl-border').value = vis.borderW; }
-function updateVisuals() { vis.extDark = document.getElementById('sl-dark').value; vis.zoneAlpha = document.getElementById('sl-alpha').value; vis.borderW = document.getElementById('sl-border').value; localStorage.setItem('riegoVis', JSON.stringify(vis)); renderSVG(); }
-function mostrarToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
-function toggleDia(btn) { btn.classList.toggle('active'); }
-
-const DICT_ICONS = {
-  gota: '<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>', piscina: '<path d="M22 12H2M4 12v6a2 2 0 002 2h12a2 2 0 002-2v-6M9 8v4M15 8v4M9 10h6"/>',
-  pozo: '<path d="M5 21v-4M19 21v-4M3 17h18v4H3zM5 17V3M19 17V3M5 7h14M12 7v4M9 11h6v4H9z"/>', canal: '<path d="M2 12c3 3 6-3 10 0s7 3 10 0M2 18c3 3 6-3 10 0s7 3 10 0M2 6c3 3 6-3 10 0s7 3 10 0"/>',
-  aspersor: '<path d="M12 14v8M9 14h6M12 11v3M7 8l2 3M17 8l-2 3M4 5l3 3M20 5l-3 3"/>', valvula: '<path d="M6 9l12 6M6 15l12-6M4 6v12M20 6v12M12 10.5V3M10 3h4"/>',
-  planta: '<path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/>', arbol: '<path d="M12 22v-6M8 8a4 4 0 1 1 8 0c1.5 0 3 1.5 3 3a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4c0-1.5 1.5-3 3-3z"/><circle cx="10" cy="8" r="1"/><circle cx="14" cy="11" r="1"/>',
-  invernadero: '<path d="M2 22h20M4 22V10l8-8 8 8v12M4 14h16M12 10v12M8 10v12M16 10v12"/>', casa: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
-  bodega: '<path d="M3 21V8l9-4 9 4v13M9 21v-5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v5M4 10h16M4 14h16"/>', porton: '<path d="M4 22V2M20 22V2M4 6h16M4 10h16M4 14h16M4 18h16M9 6v16M15 6v16"/>',
-  estacionamiento: '<path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11M3 11h18v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6z"/><circle cx="7" cy="15" r="1"/><circle cx="17" cy="15" r="1"/>',
-  pin: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>'
-};
-
-const wrapper = document.getElementById('map-wrapper'); const transformEl = document.getElementById('map-transform');
-const imgEl = document.getElementById('map-image'); const svgEl = document.getElementById('map-svg');
-
-let mapState = { mode: 'pan', view: 'map', scale: 1, tx: 0, ty: 0, isDragging: false, startX: 0, startY: 0, clickX: 0, clickY: 0, imgWidth: 0, imgHeight: 0, circleCenter: null, tempRadius: 0 };
-let perimeter = []; let zones = []; let markers = []; let currentDraw = []; let selectedItem = { type: null, id: null }; let draggingMarkerId = null;
-
-/*
- * Correspondencia física del sistema de riego.
+  const svgLight = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y…1035 tokens truncated…el sistema de riego.
  * La ESP32 usa sector base 0: Válvula 1 => sector 0 ... Válvula 8 => sector 7.
  */
 const RIEGO_HARDWARE = [

@@ -163,9 +163,10 @@
         <div class="maria-chat-mark">${iconSparkles()}</div>
         <div class="maria-chat-title">
           <strong>María IA</strong>
-          <div class="maria-chat-status"><span class="maria-chat-status-dot"></span><span id="maria-chat-status-text">Lista para ayudarte</span></div>
+          <div class="maria-chat-status"><span class="maria-chat-status-dot"></span><span id="maria-chat-status-text">Disponible para ayudarte</span></div>
         </div>
         <div class="maria-chat-head-actions">
+          <button class="maria-chat-icon-btn" id="assistant-settings-open" type="button" title="Nombre y voz" aria-label="Configurar nombre y voz">⚙</button>
           <button class="maria-chat-icon-btn" id="maria-chat-clear" type="button" title="Nueva conversación" aria-label="Nueva conversación">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
           </button>
@@ -188,6 +189,7 @@
     document.body.appendChild(launcher);
     document.body.appendChild(panel);
 
+    panel.querySelector('#assistant-settings-open').onclick = () => window.AssistantSettings.open();
     const body = panel.querySelector('#maria-chat-body');
     const input = panel.querySelector('#maria-chat-input');
     const send = panel.querySelector('#maria-chat-send');
@@ -205,6 +207,7 @@
             <button class="maria-chat-chip" type="button">¿Cómo estará el clima en Pirque?</button>
           </div>
         </div>`;
+      window.AssistantSettings.refresh();
       body.querySelectorAll('.maria-chat-chip').forEach(btn => btn.addEventListener('click', () => enviar(btn.textContent)));
     }
 
@@ -268,7 +271,7 @@
         const respuesta = await window.MariaAI.procesar(texto);
         removeTyping();
         addMessage('assistant', respuesta || 'Listo.');
-        status.textContent = 'Lista para ayudarte';
+        status.textContent = 'Disponible para ayudarte';
       } catch (err) {
         removeTyping();
         const msg = err?.message || String(err) || 'Ocurrió un error al consultar a María.';

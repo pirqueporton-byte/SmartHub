@@ -40,6 +40,11 @@
     }
   };
 
+  window.addEventListener('assistant-settings-changed', () => {
+    MARIA.conversationUntil = 0;
+    if (MARIA.ui) actualizarUI(MARIA.ui.dataset.state || 'inactivo');
+  });
+
   const DIAS = [
     { id: '0', largo: 'domingo', corto: 'dom' },
     { id: '1', largo: 'lunes', corto: 'lun' },
@@ -132,7 +137,7 @@
     };
     MARIA.ui.dataset.state = estado;
     const label = MARIA.ui.querySelector('.maria-label');
-    if (label) label.textContent = texto || etiquetas[estado] || 'María';
+    if (label) label.textContent = window.AssistantSettings.display(texto || etiquetas[estado] || 'María');
   }
 
   // Esperar onend evita mantener la captura activa al reproducir una respuesta.
@@ -220,6 +225,7 @@
     utterance.rate = 1;
     utterance.pitch = 1;
     utterance.volume = 1;
+    window.AssistantSettings.apply(utterance, opciones.voiceSettings);
     const finish = (error) => {
       if (id !== MARIA.speechId) return;
       clearTimeout(MARIA.speechTimer);
@@ -677,8 +683,7 @@
   }
 
   async function procesarComandoVoz(textoOriginal) {
-    const t = normalizar(textoOriginal)
-      .replace(/\b(maria|maría)\b/g, '')
+    const t = window.AssistantSettings.strip(textoOriginal)
       .replace(/\s+/g, ' ')
       .trim();
 
@@ -755,7 +760,7 @@
       MARIA.lastTranscriptAt = now;
 
       console.log('María escuchó:', frase);
-      const invocada = /\b(maria|maría)\b/i.test(frase);
+      const invocada = window.AssistantSettings.invoked(frase);
 
       if (invocada) {
         abrirConversacion();

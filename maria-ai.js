@@ -227,7 +227,7 @@
 
   async function procesar(texto) {
     const conf = cfg();
-    state.messages.push({ role:'user', content:String(texto) });
+    state.messages.push({ role:'user', content:`[Preferencia del usuario: tu nombre es ${window.AssistantSettings.name()}. Usa ese nombre al presentarte.]\n${String(texto)}` });
     const maxHistory = Math.max(8, Number(conf.conversationMessages) || 12);
 
     let rounds = 0;
