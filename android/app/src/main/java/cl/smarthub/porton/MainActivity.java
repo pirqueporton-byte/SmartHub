@@ -76,13 +76,15 @@ public class MainActivity extends Activity {
    }
   });
   web.loadUrl(HOME);
+  CrashReport.showPrevious(this);
  }
  private void googleLogin(JavaScriptReplyProxy reply){
   if(loggingIn)return;loggingIn=true;final long page=navigation;
+  try {
   loginCancellation=new CancellationSignal();
   GetSignInWithGoogleOption option=new GetSignInWithGoogleOption.Builder(getString(R.string.default_web_client_id)).build();
   GetCredentialRequest request=new GetCredentialRequest.Builder().addCredentialOption(option).build();
-  CredentialManager.create(this).getCredentialAsync(this,request,loginCancellation,getMainExecutor(),new CredentialManagerCallback<GetCredentialResponse,GetCredentialException>(){
+  CredentialManager.create(this).getCredentialAsync(this,request,loginCancellation,command -> new Handler(Looper.getMainLooper()).post(command),new CredentialManagerCallback<GetCredentialResponse,GetCredentialException>(){
    @Override public void onResult(GetCredentialResponse result){
     loggingIn=false;if(isFinishing()||page!=navigation||!trusted(web.getUrl()))return;
     try{
@@ -94,6 +96,11 @@ public class MainActivity extends Activity {
    }
    @Override public void onError(GetCredentialException error){loggingIn=false;if(!isFinishing()&&page==navigation)fail(reply,"No se completó el acceso con Google. Si se repite, revisa la huella SHA-1 de esta APK en Firebase.");}
   });
+  } catch (RuntimeException | LinkageError error) {
+   loggingIn=false;
+   fail(reply,"No se pudo abrir Google. Código: "+error.getClass().getSimpleName());
+   new AlertDialog.Builder(this).setTitle("Acceso Google").setMessage(CrashReport.describe(error)).setPositiveButton("Aceptar",null).show();
+  }
  }
  private void fail(JavaScriptReplyProxy reply,String message){try{reply.postMessage(new JSONObject().put("error",message).toString());}catch(Exception ignored){}}
  @Override protected void onActivityResult(int request,int result,Intent data){
