@@ -30,7 +30,7 @@ jobs:
         working-directory: android
         run: gradle --no-daemon testDebugUnitTest assembleDebug
       - name: Huella de esta APK para Firebase
-        run: keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android > android/app/build/outputs/apk/debug/FIREBASE-SHA.txt
+        run: keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android | tee android/app/build/outputs/apk/debug/FIREBASE-SHA.txt
       - uses: actions/upload-artifact@v4
         with:
           name: SmartHub-Android-prueba

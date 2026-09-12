@@ -22,6 +22,7 @@ public class MainActivity extends Activity {
  private CancellationSignal loginCancellation;
  private boolean loggingIn;
  private long navigation;
+ private ValueCallback<Uri[]> files;
  static boolean trusted(String url){
   if(url==null)return false;
   Uri u=Uri.parse(url);
@@ -32,6 +33,7 @@ public class MainActivity extends Activity {
   super.onCreate(saved);
   getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
   LinearLayout root=new LinearLayout(this);root.setOrientation(1);
+  root.setOnApplyWindowInsetsListener((v,insets)->{v.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());return insets;});
   LinearLayout bar=new LinearLayout(this);bar.setPadding(12,0,12,0);
   state=new TextView(this);state.setText("SmartHub");state.setGravity(android.view.Gravity.CENTER_VERTICAL);
   bar.addView(state,new LinearLayout.LayoutParams(0,-1,1));
@@ -65,6 +67,14 @@ public class MainActivity extends Activity {
    @Override public void onReceivedError(WebView v,WebResourceRequest req,WebResourceError err){if(req.isForMainFrame()){state.setText("Sin conexión · toca para reintentar");state.setOnClickListener(w->web.loadUrl(HOME));}}
    @Override public void onReceivedSslError(WebView v,android.webkit.SslErrorHandler h,android.net.http.SslError e){h.cancel();state.setText("No se pudo verificar la conexión segura");}
   });
+  web.setWebChromeClient(new WebChromeClient(){
+   @Override public boolean onShowFileChooser(WebView v,ValueCallback<Uri[]> callback,FileChooserParams params){
+    if(!trusted(v.getUrl()))return false;
+    if(files!=null)files.onReceiveValue(null);files=callback;
+    try{startActivityForResult(params.createIntent(),51);}catch(ActivityNotFoundException e){files.onReceiveValue(null);files=null;}
+    return true;
+   }
+  });
   web.loadUrl(HOME);
  }
  private void googleLogin(JavaScriptReplyProxy reply){
@@ -86,6 +96,10 @@ public class MainActivity extends Activity {
   });
  }
  private void fail(JavaScriptReplyProxy reply,String message){try{reply.postMessage(new JSONObject().put("error",message).toString());}catch(Exception ignored){}}
+ @Override protected void onActivityResult(int request,int result,Intent data){
+  super.onActivityResult(request,result,data);
+  if(request==51&&files!=null){files.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result,data));files=null;}
+ }
  @Override public void onBackPressed(){if(web!=null&&web.canGoBack())web.goBack();else super.onBackPressed();}
  @Override protected void onDestroy(){if(loginCancellation!=null)loginCancellation.cancel();if(web!=null)web.destroy();super.onDestroy();}
 }
