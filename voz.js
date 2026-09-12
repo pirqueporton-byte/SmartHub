@@ -24,7 +24,12 @@
     speechTimer: null,
     releaseAudio: null,
     conversationUntil: 0,
-    conversationMs: 18000,
+    conversationMs: 60000,
+    pendingConversationMs: 0,
+    conversationTimer: null,
+    processing: false,
+    readyCue: true,
+    audioReady: false,
     lastContext: null,
     lastTranscript: '',
     lastTranscriptAt: 0,
@@ -72,14 +77,49 @@
     return Date.now() < MARIA.conversationUntil;
   }
 
+  let cueContext;
+  function prepararSonidos() {
+    try {
+      const Audio = window.AudioContext || window.webkitAudioContext;
+      if (!Audio) return;
+      cueContext ||= new Audio();
+      if (cueContext.state === 'suspended') cueContext.resume().catch(() => {});
+    } catch (_) {}
+  }
+  document.addEventListener('pointerdown', prepararSonidos, { passive: true });
+  document.addEventListener('keydown', prepararSonidos);
+  function sonido(tipo) {
+    if (!cueContext || cueContext.state !== 'running' || document.hidden) return;
+    try {
+      const frequencies = tipo === 'listo' ? [660, 880] : tipo === 'recibido' ? [520] : [440, 300];
+      frequencies.forEach((f, i) => {
+        const osc = cueContext.createOscillator(), gain = cueContext.createGain();
+        const t = cueContext.currentTime + i * .11;
+        osc.frequency.value = f;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(.07, t + .015);
+        gain.gain.exponentialRampToValueAtTime(.001, t + .09);
+        osc.connect(gain); gain.connect(cueContext.destination);
+        osc.start(t); osc.stop(t + .1);
+        osc.onended = () => { osc.disconnect(); gain.disconnect(); };
+      });
+    } catch (_) {}
+  }
   function abrirConversacion(ms = MARIA.conversationMs) {
+    clearTimeout(MARIA.conversationTimer);
     MARIA.conversationUntil = Date.now() + ms;
-    actualizarUI('conversando');
+    MARIA.conversationTimer = setTimeout(() => {
+      if (!MARIA.speaking && !MARIA.processing && !MARIA.pendingConversationMs) cerrarConversacion();
+    }, ms);
+    if (MARIA.audioReady && !MARIA.processing && !MARIA.speaking) actualizarUI('conversando');
   }
 
   function cerrarConversacion() {
+    clearTimeout(MARIA.conversationTimer);
     MARIA.conversationUntil = 0;
-    actualizarUI(MARIA.listening ? 'escuchando' : 'inactivo');
+    MARIA.pendingConversationMs = 0;
+    sonido('fin');
+    actualizarUI(MARIA.audioReady ? 'escuchando' : 'inactivo');
   }
 
   function crearUI() {
@@ -106,6 +146,7 @@
     el.type = 'button';
     el.title = 'Pausar o reactivar el micrófono';
     el.addEventListener('click', () => {
+      prepararSonidos();
       if (MARIA.listening && !MARIA.blocked && !MARIA.suspended) {
         MARIA.listening = false;
         suspenderVoz();
@@ -130,8 +171,10 @@
     if (!MARIA.ui) return;
     const etiquetas = {
       inactivo: 'María · inactiva',
-      escuchando: 'María · escuchando',
-      conversando: 'María · te escucha',
+      escuchando: 'Di ' + window.AssistantSettings.name() + ' para comenzar',
+      conversando: 'María · habla, te escucho',
+      conectando: 'María · preparando micrófono',
+      pensando: 'María · procesando tu pedido',
       hablando: 'María · respondiendo',
       error: 'María · voz no disponible'
     };
@@ -155,12 +198,13 @@
 
   function reanudarReconocimiento(delay = 350) {
     clearTimeout(MARIA.restartTimer);
-    if (!MARIA.listening || MARIA.blocked || MARIA.suspended || document.hidden || MARIA.speaking) return;
+    if (!MARIA.listening || MARIA.blocked || MARIA.suspended || document.hidden || MARIA.speaking || MARIA.processing) return;
     MARIA.restartTimer = setTimeout(() => {
-      if (!MARIA.listening || MARIA.blocked || MARIA.suspended || document.hidden || MARIA.speaking || MARIA.active || MARIA.starting) return;
+      if (!MARIA.listening || MARIA.blocked || MARIA.suspended || document.hidden || MARIA.speaking || MARIA.processing || MARIA.active || MARIA.starting) return;
       if (!MARIA.recognition) iniciarAsistenteMaria();
       if (!MARIA.recognition) return;
       try {
+        actualizarUI('conectando');
         MARIA.starting = true;
         MARIA.recognition.start();
       } catch (error) {
@@ -174,6 +218,10 @@
   function suspenderVoz() {
     MARIA.suspended = true;
     MARIA.speechId++;
+    MARIA.processing = false;
+    MARIA.audioReady = false;
+    MARIA.pendingConversationMs = 0;
+    clearTimeout(MARIA.conversationTimer);
     clearTimeout(MARIA.restartTimer);
     clearTimeout(MARIA.speechTimer);
     MARIA.speaking = false;
@@ -184,7 +232,7 @@
     MARIA.active = MARIA.starting = false;
     if (MARIA.releaseAudio) { MARIA.releaseAudio(); MARIA.releaseAudio = null; }
     if (old) {
-      old.onresult = old.onend = old.onerror = old.onstart = null;
+      old.onresult = old.onend = old.onerror = old.onstart = old.onaudiostart = old.onaudioend = null;
       try { old.abort(); } catch (_) {}
     }
     actualizarUI('inactivo', 'María · en pausa');
@@ -203,6 +251,8 @@
     if (!texto || document.hidden || MARIA.suspended || !('speechSynthesis' in window)) return;
     if (opciones.contexto) MARIA.lastContext = opciones.contexto;
     const id = ++MARIA.speechId;
+    clearTimeout(MARIA.conversationTimer);
+    MARIA.audioReady = false;
     clearTimeout(MARIA.speechTimer);
     MARIA.speaking = true;
     window.speechSynthesis.cancel();
@@ -226,15 +276,21 @@
     utterance.pitch = 1;
     utterance.volume = 1;
     window.AssistantSettings.apply(utterance, opciones.voiceSettings);
+    let finished = false;
     const finish = (error) => {
-      if (id !== MARIA.speechId) return;
+      if (finished || id !== MARIA.speechId) return;
+      finished = true;
       clearTimeout(MARIA.speechTimer);
       MARIA.speaking = false;
-      if (opciones.seguir !== false) abrirConversacion(opciones.ms || MARIA.conversationMs);
-      actualizarUI(error ? 'error' : (MARIA.listening ? 'escuchando' : 'inactivo'),
-        error ? 'María · toca para reactivar' : '');
-      // Deja que el móvil libere la salida antes de volver a capturar audio.
-      reanudarReconocimiento(900);
+      if (opciones.seguir !== false) {
+        MARIA.pendingConversationMs = Math.max(MARIA.conversationMs, opciones.ms || 0);
+        MARIA.readyCue = true;
+      } else {
+        MARIA.pendingConversationMs = 0;
+        MARIA.conversationUntil = 0;
+      }
+      actualizarUI(error ? 'error' : 'conectando', error ? 'María · no pude reproducir la respuesta' : '');
+      reanudarReconocimiento(250);
     };
     utterance.onend = () => finish(false);
     utterance.onerror = () => finish(true);
@@ -683,9 +739,15 @@
   }
 
   async function procesarComandoVoz(textoOriginal) {
-    const t = window.AssistantSettings.strip(textoOriginal)
+    const t = normalizar(window.AssistantSettings.strip(textoOriginal))
       .replace(/\s+/g, ' ')
       .trim();
+
+    if (['gracias', 'eso es todo', 'terminar conversacion', 'no necesito nada mas'].includes(t)) {
+      cerrarConversacion();
+      hablarRespuesta('De acuerdo.', { seguir: false });
+      return;
+    }
 
     if (!t) {
       hablarRespuesta('Sí, te escucho.', { contexto: MARIA.lastContext || { tipo: 'general' } });
@@ -698,12 +760,12 @@
       // Los comandos críticos más simples siguen locales: son rápidos y funcionan
       // incluso si el servicio de IA no está disponible.
       if (await responderPorton(t)) return;
-      if (await ejecutarRiegoManual(t)) return;
+      if (MARIA.lastContext?.tipo !== 'ia' && await ejecutarRiegoManual(t)) return;
 
       // Para todo lo demás, María IA entiende lenguaje natural y decide qué
       // herramientas consultar. Esto evita mantener cientos de frases exactas.
       if (window.MariaAI?.disponible?.()) {
-        actualizarUI('hablando', 'María · pensando');
+        actualizarUI('pensando');
         const respuestaIA = await window.MariaAI.procesar(t);
         hablarRespuesta(respuestaIA, { contexto: { tipo: 'ia' }, ms: 28000 });
         return;
@@ -746,10 +808,23 @@
     recognition.onstart = () => {
       MARIA.starting = false;
       MARIA.active = true;
-      actualizarUI('escuchando');
+    };
+    recognition.onaudiostart = () => {
+      if (MARIA.speaking || MARIA.processing || MARIA.suspended) return;
+      MARIA.audioReady = true;
+      if (MARIA.pendingConversationMs) {
+        abrirConversacion(MARIA.pendingConversationMs);
+        MARIA.pendingConversationMs = 0;
+      }
+      actualizarUI(ahoraConversando() ? 'conversando' : 'escuchando');
+      if (MARIA.readyCue) { sonido('listo'); MARIA.readyCue = false; }
+    };
+    recognition.onaudioend = () => {
+      MARIA.audioReady = false;
+      if (!MARIA.speaking && !MARIA.processing) actualizarUI('conectando');
     };
     recognition.onresult = (event) => {
-      if (MARIA.speaking || MARIA.suspended || document.hidden || !MARIA.listening) return;
+      if (MARIA.processing || MARIA.speaking || MARIA.suspended || document.hidden || !MARIA.listening) return;
       const frase = event.results[event.results.length - 1][0].transcript.trim();
       const norm = normalizar(frase);
       const now = Date.now();
@@ -762,18 +837,16 @@
       console.log('María escuchó:', frase);
       const invocada = window.AssistantSettings.invoked(frase);
 
-      if (invocada) {
-        abrirConversacion();
-        procesarComandoVoz(frase);
-        return;
-      }
-
-      // Durante la ventana conversacional acepta preguntas de seguimiento
-      // sin exigir nuevamente la palabra de activación.
-      if (ahoraConversando()) {
-        abrirConversacion();
-        procesarComandoVoz(frase);
-      }
+      if (!invocada && !ahoraConversando()) return;
+      sonido('recibido');
+      MARIA.processing = true;
+      clearTimeout(MARIA.conversationTimer);
+      actualizarUI('pensando');
+      const requestId = MARIA.speechId;
+      Promise.resolve(procesarComandoVoz(frase)).finally(() => {
+        MARIA.processing = false;
+        if (!MARIA.speaking && !MARIA.suspended && requestId === MARIA.speechId) reanudarReconocimiento(250);
+      });
     };
 
     recognition.onerror = (event) => {
@@ -782,6 +855,8 @@
         console.warn('Error de voz:', event.error);
       }
       if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        sonido('fin');
+        MARIA.pendingConversationMs = 0;
         MARIA.listening = false;
         MARIA.blocked = true;
         clearTimeout(MARIA.restartTimer);
@@ -791,6 +866,7 @@
 
     recognition.onend = () => {
       MARIA.active = MARIA.starting = false;
+      MARIA.audioReady = false;
       if (MARIA.releaseAudio) { MARIA.releaseAudio(); MARIA.releaseAudio = null; }
       if (MARIA.listening && !MARIA.speaking) reanudarReconocimiento(600);
     };
