@@ -25,3 +25,12 @@ APK nativa para Android 8 o posterior, con modo conducción y Vosk local en espa
 ## Compilación
 
 Java 17, Android SDK 35, Gradle 8.11.1. GitHub Actions descarga el modelo español `vosk-model-small-es-0.42` desde el proveedor y genera el APK y las pruebas unitarias. Modelo y Vosk bajo Apache 2.0; JNA LGPL 2.1 / Apache 2.0. Fuentes: https://alphacephei.com/vosk/models y https://github.com/alphacep/vosk-android-demo .
+
+
+## Versión 0.2 integrada
+
+La pantalla inicial contiene la PWA en WebView y un botón Conducción que abre los controles nativos dentro de la misma APK. El inicio de sesión utiliza Credential Manager y entrega el ID token Google únicamente al marco principal de SmartHub mediante WebMessageListener restringido al origen. La web conserva sus comprobaciones de autorización y configuración Firebase; no se migra ninguna cuenta. No se permite navegación principal fuera de /SmartHub/.
+
+El cliente web OAuth proviene del google-services.json del proyecto 556068512549. Registra en Firebase la SHA-1 de FIREBASE-SHA.txt incluida junto a la APK. Los builds de prueba todavía usan una firma debug nueva por ejecución: una siguiente compilación puede requerir registrar su nueva huella y reinstalar. Para distribución estable hay que configurar firma privada persistente en secretos de CI; nunca publicar el keystore.
+
+La conexión Worker y la escucha local conservan su configuración anterior. Esta versión aún requiere configurar esa conexión en Conducción; el acceso Google web no reemplaza el token del Worker. Las funciones de voz web dependen del soporte de WebView; el modo conducción usa el micrófono nativo. Validar acceso Google, navegación, cerrar sesión y escucha bloqueada en dispositivo real antes de distribuir.

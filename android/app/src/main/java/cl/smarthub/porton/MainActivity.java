@@ -1,42 +1,91 @@
 package cl.smarthub.porton;
-import android.Manifest;
+
 import android.app.*;
-import android.os.*;
 import android.content.*;
-import android.content.pm.PackageManager;
 import android.net.Uri;
-import android.text.InputType;
+import android.os.*;
+import android.webkit.*;
 import android.widget.*;
-import android.graphics.Color;
-import androidx.browser.customtabs.CustomTabsIntent;
+import androidx.credentials.*;
+import androidx.credentials.exceptions.GetCredentialException;
+import androidx.webkit.*;
+import com.google.android.libraries.identity.googleid.*;
+import org.json.JSONObject;
+import java.util.Collections;
+
+/** Hosts the existing SmartHub pages. Google account selection is always native. */
 public class MainActivity extends Activity {
- TextView status;Switch test;EditText endpoint,token;
- final Handler handler=new Handler();
- final Runnable refresh=new Runnable(){public void run(){status.setText(DriveService.status);handler.postDelayed(this,1000);}};
- @Override public void onCreate(Bundle state){super.onCreate(state);getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
-  ScrollView scroll=new ScrollView(this);LinearLayout box=new LinearLayout(this);box.setOrientation(1);box.setPadding(32,48,32,32);scroll.addView(box);setContentView(scroll);
-  TextView title=new TextView(this);title.setText("SmartHub");title.setTextSize(30);title.setTextColor(Color.rgb(21,126,117));box.addView(title);
-  label(box,"Portón · Android de prueba");button(box,"Abrir mi SmartHub",()->new CustomTabsIntent.Builder().setShowTitle(false).build().launchUrl(this,Uri.parse("https://pirqueporton-byte.github.io/SmartHub/")));
-  label(box,"Modo conducción");status=label(box,DriveService.status);
-  label(box,"Actívalo con el teléfono desbloqueado. Después del aviso puedes bloquearlo y decir: «abre el portón». Para terminar: «terminar modo conducción». La escucha consume batería mientras está activa.");
-  test=new Switch(this);test.setText("Prueba sin mover el portón");test.setChecked(getSharedPreferences("native",0).getBoolean("test",true));box.addView(test);
-  test.setOnCheckedChangeListener((b,on)->{stopService(new Intent(this,DriveService.class));getSharedPreferences("native",0).edit().putBoolean("test",on).apply();});
-  button(box,"Activar modo conducción",this::startDrive);button(box,"Detener escucha",()->stopService(new Intent(this,DriveService.class)));
-  button(box,"Abrir portón ahora",()->new AlertDialog.Builder(this).setMessage("¿Enviar la orden de apertura al portón?").setNegativeButton("Cancelar",null).setPositiveButton("Abrir",(d,w)->request(false)).show());
-  label(box,"Conexión del portón");label(box,"Usa la dirección del Worker del atajo de Siri (sin /abrir) y su SIRI_TOKEN. La clave queda cifrada en este teléfono. No es la clave de Anthropic.");
-  endpoint=new EditText(this);endpoint.setSingleLine();endpoint.setHint("https://tu-worker.workers.dev");endpoint.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_URI);endpoint.setText(getSharedPreferences("native",0).getString("endpoint",""));box.addView(endpoint);
-  token=new EditText(this);token.setSingleLine();token.setHint("SIRI_TOKEN · dejar vacío conserva la clave");token.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);box.addView(token);
-  button(box,"Guardar conexión",this::save);button(box,"Verificar sin abrir",()->request(true));
+ private static final String ORIGIN="https://pirqueporton-byte.github.io";
+ private static final String HOME=ORIGIN+"/SmartHub/";
+ private WebView web;
+ private TextView state;
+ private CancellationSignal loginCancellation;
+ private boolean loggingIn;
+ private long navigation;
+ static boolean trusted(String url){
+  if(url==null)return false;
+  Uri u=Uri.parse(url);
+  return "https".equals(u.getScheme())&&"pirqueporton-byte.github.io".equals(u.getHost())
+    &&u.getPort()==-1&&u.getUserInfo()==null&&u.getPath()!=null&&u.getPath().startsWith("/SmartHub/");
  }
- TextView label(LinearLayout b,String t){TextView v=new TextView(this);v.setText(t);v.setTextSize(16);v.setPadding(0,14,0,14);b.addView(v);return v;}
- void button(LinearLayout b,String t,Runnable r){Button v=new Button(this);v.setText(t);b.addView(v);v.setOnClickListener(w->r.run());}
- void save(){try{String url=endpoint.getText().toString().trim(),key=token.getText().toString().trim();if(!Commands.validEndpoint(url))throw new Exception("Ingresa la dirección https del Worker, sin /abrir ni parámetros.");if(!key.isEmpty()){if(!key.matches("[a-fA-F0-9]{64}"))throw new Exception("La clave debe tener 64 caracteres hexadecimales.");Secrets.save(this,key);}else Secrets.read(this);getSharedPreferences("native",0).edit().putString("endpoint",url).apply();stopService(new Intent(this,DriveService.class));token.setText("");Toast.makeText(this,"Conexión guardada",Toast.LENGTH_SHORT).show();}catch(Exception e){new AlertDialog.Builder(this).setMessage(e.getMessage()==null?"Guarda una clave válida antes de continuar.":e.getMessage()).setPositiveButton("Aceptar",null).show();}}
- void request(boolean verify){status.setText("Consultando…");new Thread(()->{String result;try{result=GateClient.request(this,verify);}catch(Exception e){result=verify?"No pude verificar la conexión.":"No pude confirmar la apertura. Revisa antes de repetirla.";}String message=result;runOnUiThread(()->new AlertDialog.Builder(this).setMessage(message).setPositiveButton("Aceptar",null).show());}).start();}
- void startDrive(){try{Secrets.read(this);if(!Commands.validEndpoint(getSharedPreferences("native",0).getString("endpoint","")))throw new Exception();}catch(Exception e){new AlertDialog.Builder(this).setMessage("Primero guarda y verifica la conexión del portón.").setPositiveButton("Aceptar",null).show();return;}
-  java.util.ArrayList<String> needed=new java.util.ArrayList<>();if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED)needed.add(Manifest.permission.RECORD_AUDIO);if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)needed.add(Manifest.permission.POST_NOTIFICATIONS);
-  if(!needed.isEmpty()){requestPermissions(needed.toArray(new String[0]),1);return;}startForegroundService(new Intent(this,DriveService.class));
+ @Override public void onCreate(Bundle saved){
+  super.onCreate(saved);
+  getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
+  LinearLayout root=new LinearLayout(this);root.setOrientation(1);
+  LinearLayout bar=new LinearLayout(this);bar.setPadding(12,0,12,0);
+  state=new TextView(this);state.setText("SmartHub");state.setGravity(android.view.Gravity.CENTER_VERTICAL);
+  bar.addView(state,new LinearLayout.LayoutParams(0,-1,1));
+  Button drive=new Button(this);drive.setText("Conducción");
+  drive.setOnClickListener(v->startActivity(new Intent(this,DrivingActivity.class)));bar.addView(drive);
+  root.addView(bar);web=new WebView(this);root.addView(web,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);
+  if(!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)){
+   state.setText("Actualiza Android System WebView para usar SmartHub");return;
+  }
+  WebSettings s=web.getSettings();s.setJavaScriptEnabled(true);s.setDomStorageEnabled(true);
+  s.setAllowFileAccess(false);s.setAllowContentAccess(false);s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+  s.setJavaScriptCanOpenWindowsAutomatically(false);
+  CookieManager.getInstance().setAcceptCookie(true);
+  WebViewCompat.addWebMessageListener(web,"SmartHubAndroid",Collections.singleton(ORIGIN),(view,message,origin,main,reply)->{
+   if(!main||!ORIGIN.equals(origin.toString())||!trusted(view.getUrl()))return;
+   if("google-login".equals(message.getData()))googleLogin(reply);
+  });
+  web.setWebViewClient(new WebViewClient(){
+   @Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest request){
+    if(!request.isForMainFrame())return false;
+    if(trusted(request.getUrl().toString()))return false;
+    state.setText("Enlace externo: abre SmartHub desde tu navegador para visitarlo");return true;
+   }
+   @Override public void onPageStarted(WebView v,String url,android.graphics.Bitmap icon){navigation++;state.setText("Cargando SmartHub…");}
+   @Override public void onPageFinished(WebView v,String url){
+    if(!trusted(url))return;
+    state.setText("SmartHub");
+    // Inject no credentials into a URL, history, preferences or logs. The reply belongs to the requesting frame.
+    v.evaluateJavascript("(function(){if(!window.firebase||!window.SmartHubAndroid)return;window.SmartHubAndroid.onmessage=function(e){var d=JSON.parse(e.data);if(d.token){firebase.auth().signInWithCredential(firebase.auth.GoogleAuthProvider.credential(d.token)).catch(function(){if(window.showError)showError('No se pudo iniciar sesión. Revisa la configuración de Google de la APK.');});}else if(window.showError){showError(d.error);}};window.iniciarSesion=function(){if(window.mostrarCarga)mostrarCarga(true);window.SmartHubAndroid.postMessage('google-login');};})();",null);
+   }
+   @Override public void onReceivedError(WebView v,WebResourceRequest req,WebResourceError err){if(req.isForMainFrame()){state.setText("Sin conexión · toca para reintentar");state.setOnClickListener(w->web.loadUrl(HOME));}}
+   @Override public void onReceivedSslError(WebView v,android.webkit.SslErrorHandler h,android.net.http.SslError e){h.cancel();state.setText("No se pudo verificar la conexión segura");}
+  });
+  web.loadUrl(HOME);
  }
- @Override public void onRequestPermissionsResult(int r,String[] p,int[] g){super.onRequestPermissionsResult(r,p,g);Toast.makeText(this,"Con permisos concedidos, vuelve a pulsar Activar modo conducción.",Toast.LENGTH_LONG).show();}
- @Override public void onResume(){super.onResume();handler.post(refresh);}
- @Override public void onPause(){handler.removeCallbacks(refresh);super.onPause();}
+ private void googleLogin(JavaScriptReplyProxy reply){
+  if(loggingIn)return;loggingIn=true;final long page=navigation;
+  loginCancellation=new CancellationSignal();
+  GetSignInWithGoogleOption option=new GetSignInWithGoogleOption.Builder(getString(R.string.default_web_client_id)).build();
+  GetCredentialRequest request=new GetCredentialRequest.Builder().addCredentialOption(option).build();
+  CredentialManager.create(this).getCredentialAsync(this,request,loginCancellation,getMainExecutor(),new CredentialManagerCallback<GetCredentialResponse,GetCredentialException>(){
+   @Override public void onResult(GetCredentialResponse result){
+    loggingIn=false;if(isFinishing()||page!=navigation||!trusted(web.getUrl()))return;
+    try{
+     Credential credential=result.getCredential();
+     if(!(credential instanceof CustomCredential)||!GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL.equals(credential.getType()))throw new IllegalArgumentException();
+     String token=GoogleIdTokenCredential.createFrom(credential.getData()).getIdToken();
+     reply.postMessage(new JSONObject().put("token",token).toString());
+    }catch(Exception e){fail(reply,"No se pudo obtener la cuenta Google.");}
+   }
+   @Override public void onError(GetCredentialException error){loggingIn=false;if(!isFinishing()&&page==navigation)fail(reply,"No se completó el acceso con Google. Si se repite, revisa la huella SHA-1 de esta APK en Firebase.");}
+  });
+ }
+ private void fail(JavaScriptReplyProxy reply,String message){try{reply.postMessage(new JSONObject().put("error",message).toString());}catch(Exception ignored){}}
+ @Override public void onBackPressed(){if(web!=null&&web.canGoBack())web.goBack();else super.onBackPressed();}
+ @Override protected void onDestroy(){if(loginCancellation!=null)loginCancellation.cancel();if(web!=null)web.destroy();super.onDestroy();}
 }
