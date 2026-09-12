@@ -15,3 +15,21 @@ calls=0;assert.equal((await worker.fetch(req('/abrir','bad'),env)).status,401);a
 assert.equal((await worker.fetch(req('/abrir',env.SIRI_TOKEN,'GET'),env)).status,405);
 assert.equal((await worker.fetch(req('/abrir',env.SIRI_TOKEN,'POST',{accion:'cerrar'}),env)).status,400);
 console.log('PASS: auth, expired session, offline, recent command, ETag conflict, uncertain delivery, no retries, verify never writes, explicit command only. No real network requests.');
+const normalFetch=globalThis.fetch;
+for(const [stage,match] of [['renovar_sesion','securetoken'],['validar_cuenta','accounts:lookup'],['leer_porton','estado_porton']]){
+ for(const kind of ['fallo_conexion','tiempo_agotado','respuesta_invalida']){
+  mode='ok';writes=0;
+  globalThis.fetch=async(url,opt)=>{
+   if(url.includes(match)){
+    if(kind==='respuesta_invalida')return new Response('invalid-json-private-value');
+    const error=new Error('private-token-must-not-leak');if(kind==='tiempo_agotado')error.name='TimeoutError';throw error;
+   }
+   return normalFetch(url,opt);
+  };
+  const response=await worker.fetch(req('/verificar'),env);const body=await response.json();
+  assert.equal(response.status,502);assert.equal(body.codigo,stage+':'+kind);assert.equal(writes,0);
+  assert(!JSON.stringify(body).includes('private-'));assert(body.mensaje.includes('No envié la orden'));
+ }
+}
+globalThis.fetch=normalFetch;
+console.log('PASS: all three upstream stages, timeout/connection/JSON failures, no credential disclosure and no writes during diagnostics.');

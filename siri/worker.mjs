@@ -32,6 +32,7 @@ export default {
       } catch (_) { return json(400, 'La orden no tiene un formato válido.'); }
     }
     let writing = false;
+    let etapa = 'renovar_sesion';
     try {
       const tokenResponse = await network(`https://securetoken.googleapis.com/v1/token?key=${API_KEY}`, {
         method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -40,6 +41,7 @@ export default {
       if (!tokenResponse.ok) return json(401, 'Vuelve a vincular la cuenta de SmartHub en Cloudflare.');
       const token = await tokenResponse.json();
       if (!token.id_token || !token.user_id) return json(502, 'No se pudo validar la sesión.');
+      etapa = 'validar_cuenta';
       const accountResponse = await network(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${API_KEY}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: token.id_token })
       });
@@ -48,6 +50,7 @@ export default {
       if (!account || account.disabled || account.localId !== token.user_id || account.email !== ADMIN_EMAIL || !account.emailVerified) {
         return json(403, 'Vincula la cuenta administradora autorizada de SmartHub.');
       }
+      etapa = 'leer_porton';
       const stateUrl = `${DATABASE}/estado_porton.json?auth=${encodeURIComponent(token.id_token)}`;
       const stateResponse = await network(stateUrl, { headers: { 'X-Firebase-ETag': 'true' } });
       if (!stateResponse.ok) return json(403, 'Firebase no permite acceder al portón con esta cuenta.');
@@ -65,6 +68,7 @@ export default {
       }
       if (!etag) return json(502, 'No se pudo comprobar el estado del portón. No envié la orden.');
       // Escritura condicional: no pisa latidos/comandos concurrentes ni reintenta una apertura.
+      etapa = 'enviar_orden';
       writing = true;
       const written = await network(stateUrl, {
         method: 'PUT', headers: { 'Content-Type': 'application/json', 'If-Match': etag },
@@ -73,8 +77,15 @@ export default {
       if (written.status === 412) return json(409, 'El estado cambió durante la consulta. No envié la orden; puedes volver a pedirla.');
       if (!written.ok) return json(502, 'No pude confirmar el envío de la orden. Revisa el portón antes de repetirla.');
       return json(200, 'Orden de apertura enviada.', { enviada: true });
-    } catch (_) {
-      return json(502, writing ? 'No pude confirmar el envío de la orden. Revisa el portón antes de repetirla.' : 'No pude conectar con SmartHub. No envié la orden.');
+    } catch (error) {
+      // Solo códigos controlados: nunca registrar URLs, tokens ni respuestas de Firebase.
+      const tipo = ['TimeoutError', 'AbortError'].includes(error?.name) ? 'tiempo_agotado'
+        : error instanceof SyntaxError ? 'respuesta_invalida' : 'fallo_conexion';
+      const codigo = etapa + ':' + tipo;
+      const pasos = { renovar_sesion: 'renovar la sesión de Firebase', validar_cuenta: 'validar la cuenta de Google', leer_porton: 'leer el estado del portón', enviar_orden: 'enviar la orden' };
+      console.warn('SmartHub conexión', codigo);
+      return json(502, writing ? 'No pude confirmar el envío de la orden. Revisa el portón antes de repetirla. Código: ' + codigo
+        : 'Falló la conexión al ' + pasos[etapa] + '. No envié la orden. Código: ' + codigo, { codigo, version: '20260912-diagnostico' });
     }
   }
 };
