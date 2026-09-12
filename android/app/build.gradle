@@ -14,8 +14,9 @@ android {
  compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
 dependencies {
- // Credential provider excludes loader transitively; FragmentActivity still references it at runtime.
+ // Credential provider excludes core/loader; declare the runtime types required by FragmentActivity.
  implementation 'androidx.loader:loader:1.1.0'
+ implementation 'androidx.core:core:1.10.1'
  implementation 'androidx.browser:browser:1.8.0'
  implementation 'androidx.webkit:webkit:1.12.1'
  implementation 'androidx.credentials:credentials:1.3.0'
