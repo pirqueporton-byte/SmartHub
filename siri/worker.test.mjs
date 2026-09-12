@@ -33,3 +33,18 @@ for(const [stage,match] of [['renovar_sesion','securetoken'],['validar_cuenta','
 }
 globalThis.fetch=normalFetch;
 console.log('PASS: all three upstream stages, timeout/connection/JSON failures, no credential disclosure and no writes during diagnostics.');
+const originalTimeout=AbortSignal.timeout;
+AbortSignal.timeout=undefined;
+mode='ok';writes=0;
+globalThis.fetch=async(url,options)=>{
+ assert.equal(options.redirect,'manual');assert(options.signal instanceof AbortSignal);
+ if(url.includes('securetoken'))assert.equal(typeof options.body,'string');
+ return normalFetch(url,options);
+};
+assert.equal((await worker.fetch(req('/verificar'),env)).status,200);assert.equal(writes,0);
+let redirects=0;
+globalThis.fetch=async()=>{redirects++;return new Response('',{status:302,headers:{Location:'https://untrusted.invalid'}});};
+const redirected=await (await worker.fetch(req('/verificar'),env)).json();
+assert.equal(redirected.codigo,'renovar_sesion:redireccion_bloqueada');assert.equal(redirects,1);
+AbortSignal.timeout=originalTimeout;globalThis.fetch=normalFetch;
+console.log('PASS: compatible timeout, serialized form, no redirect following or credential forwarding.');

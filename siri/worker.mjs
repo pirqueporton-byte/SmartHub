@@ -12,7 +12,20 @@ async function sameSecret(a, b) {
   let diff = 0; for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
   return diff === 0;
 }
-const network = (url, options = {}) => fetch(url, { ...options, signal: AbortSignal.timeout(8000), redirect: 'error' });
+async function network(url, options = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal, redirect: 'manual' });
+    if (response.status >= 300 && response.status < 400) {
+      await response.body?.cancel();
+      const error = new Error('redirect_blocked'); error.name = 'RedirectBlocked'; throw error;
+    }
+    // Leer el cuerpo antes de quitar el límite de tiempo.
+    const body = await response.text();
+    return new Response(body, { status: response.status, headers: response.headers });
+  } finally { clearTimeout(timer); }
+}
 export default {
   async fetch(request, env) {
     const path = new URL(request.url).pathname;
@@ -36,7 +49,7 @@ export default {
     try {
       const tokenResponse = await network(`https://securetoken.googleapis.com/v1/token?key=${API_KEY}`, {
         method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: env.FIREBASE_REFRESH_TOKEN })
+        body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: env.FIREBASE_REFRESH_TOKEN }).toString()
       });
       if (!tokenResponse.ok) return json(401, 'Vuelve a vincular la cuenta de SmartHub en Cloudflare.');
       const token = await tokenResponse.json();
@@ -80,12 +93,17 @@ export default {
     } catch (error) {
       // Solo códigos controlados: nunca registrar URLs, tokens ni respuestas de Firebase.
       const tipo = ['TimeoutError', 'AbortError'].includes(error?.name) ? 'tiempo_agotado'
-        : error instanceof SyntaxError ? 'respuesta_invalida' : 'fallo_conexion';
+        : error instanceof SyntaxError ? 'respuesta_invalida'
+        : error?.name === 'RedirectBlocked' ? 'redireccion_bloqueada'
+        : /dns|resolve|name resolution/i.test(error?.message || '') ? 'error_dns'
+        : /certificate|tls|ssl/i.test(error?.message || '') ? 'error_tls'
+        : /not a function|not defined|unsupported|not implemented/i.test(error?.message || '') ? 'incompatibilidad_runtime'
+        : 'fallo_conexion';
       const codigo = etapa + ':' + tipo;
       const pasos = { renovar_sesion: 'renovar la sesión de Firebase', validar_cuenta: 'validar la cuenta de Google', leer_porton: 'leer el estado del portón', enviar_orden: 'enviar la orden' };
       console.warn('SmartHub conexión', codigo);
       return json(502, writing ? 'No pude confirmar el envío de la orden. Revisa el portón antes de repetirla. Código: ' + codigo
-        : 'Falló la conexión al ' + pasos[etapa] + '. No envié la orden. Código: ' + codigo, { codigo, version: '20260912-diagnostico' });
+        : 'Falló la conexión al ' + pasos[etapa] + '. No envié la orden. Código: ' + codigo, { codigo, version: '20260912-conexion-v2' });
     }
   }
 };
