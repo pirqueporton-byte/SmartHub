@@ -11,6 +11,8 @@
 
 (() => {
   'use strict';
+  // The APK owns the microphone and speech so foreground and locked-screen conversations share one engine.
+  if (window.SmartHubAndroid) return;
 
   const MARIA = {
     recognition: null,

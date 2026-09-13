@@ -213,6 +213,13 @@
 
     function scrollBottom() { body.scrollTop = body.scrollHeight; }
 
+    window.addEventListener('native-maria-turn', event => {
+      if (!window.SmartHubNative) return;
+      if (body.querySelector('.maria-chat-welcome')) body.innerHTML = '';
+      if (event.detail?.question) addMessage('user', event.detail.question);
+      if (event.detail?.answer) addMessage('assistant', event.detail.answer);
+    });
+
     function addMessage(role, text) {
       const row = document.createElement('div');
       row.className = `maria-msg-row ${role}`;

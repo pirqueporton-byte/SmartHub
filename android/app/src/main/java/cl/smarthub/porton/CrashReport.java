@@ -4,7 +4,7 @@ import android.content.*;
 /** Local diagnostics: no exception messages, tokens, user details or network logs. */
 public class CrashReport extends Application {
  public static String describe(Throwable error){
-  StringBuilder report=new StringBuilder("SmartHub 0.2.2\n");
+  StringBuilder report=new StringBuilder("SmartHub 0.3\n");
   for(int cause=0;error!=null&&cause<4;cause++,error=error.getCause()){
    report.append(error.getClass().getName()).append("\n");
    if(error instanceof ClassNotFoundException && error.getMessage()!=null && error.getMessage().matches("[A-Za-z0-9_.$]+"))report.append("Clase: ").append(error.getMessage()).append("\n");

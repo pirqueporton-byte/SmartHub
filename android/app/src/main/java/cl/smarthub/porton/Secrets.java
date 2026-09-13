@@ -14,13 +14,15 @@ final class Secrets {
   if(!ks.containsAlias("gate-token")) {KeyGenerator g=KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES,"AndroidKeyStore");g.init(new KeyGenParameterSpec.Builder("gate-token",KeyProperties.PURPOSE_ENCRYPT|KeyProperties.PURPOSE_DECRYPT).setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build());g.generateKey();}
   return (SecretKey)ks.getKey("gate-token",null);
  }
- static void save(Context c,String token) throws Exception {
+ static void save(Context c,String token) throws Exception { save(c,"token",token); }
+ static synchronized void save(Context c,String slot,String token) throws Exception {
   Cipher x=Cipher.getInstance("AES/GCM/NoPadding");x.init(Cipher.ENCRYPT_MODE,key());
   String value=Base64.encodeToString(x.getIV(),Base64.NO_WRAP)+":"+Base64.encodeToString(x.doFinal(token.getBytes(java.nio.charset.StandardCharsets.UTF_8)),Base64.NO_WRAP);
-  if(!c.getSharedPreferences("native",0).edit().putString("token",value).commit())throw new Exception();
+  if(!c.getSharedPreferences("native",0).edit().putString(slot,value).commit())throw new Exception();
  }
- static String read(Context c) throws Exception {
-  String[] v=c.getSharedPreferences("native",0).getString("token","").split(":");if(v.length!=2)throw new Exception();
+ static String read(Context c) throws Exception { return read(c,"token"); }
+ static synchronized String read(Context c,String slot) throws Exception {
+  String[] v=c.getSharedPreferences("native",0).getString(slot,"").split(":");if(v.length!=2)throw new Exception();
   Cipher x=Cipher.getInstance("AES/GCM/NoPadding");x.init(Cipher.DECRYPT_MODE,key(),new GCMParameterSpec(128,Base64.decode(v[0],Base64.NO_WRAP)));
   return new String(x.doFinal(Base64.decode(v[1],Base64.NO_WRAP)),java.nio.charset.StandardCharsets.UTF_8);
  }
