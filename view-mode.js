@@ -65,6 +65,13 @@
         dialog.showModal();
       });
       host.appendChild(trigger);
+      if (!window.SmartHubAndroid) {
+        const siri = document.createElement('a');
+        siri.href = 'siri.html'; siri.className = 'view-mode-trigger';
+        siri.style.textDecoration = 'none';
+        siri.innerHTML = '<span>Conectar con Siri</span>';
+        host.appendChild(siri);
+      }
     }
     sync();
   }

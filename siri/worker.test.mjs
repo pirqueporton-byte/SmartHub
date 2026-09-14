@@ -48,3 +48,4 @@ const redirected=await (await worker.fetch(req('/verificar'),env)).json();
 assert.equal(redirected.codigo,'renovar_sesion:redireccion_bloqueada');assert.equal(redirects,1);
 AbortSignal.timeout=originalTimeout;globalThis.fetch=normalFetch;
 console.log('PASS: compatible timeout, serialized form, no redirect following or credential forwarding.');
+
