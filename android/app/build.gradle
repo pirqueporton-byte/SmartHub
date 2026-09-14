@@ -14,6 +14,7 @@ android {
  compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
 dependencies {
+ implementation 'androidx.car.app:app:1.4.0'
  implementation 'androidx.car.app:app-projected:1.4.0'
  // Credential provider excludes core/loader; declare the runtime types required by FragmentActivity.
  implementation 'androidx.loader:loader:1.1.0'
