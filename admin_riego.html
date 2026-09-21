@@ -826,7 +826,7 @@ function procesarYComprimirImagen(e) {
       if (w > 1200) { h = Math.round((h * 1200) / w); w = 1200; }
       canvas.width = w; canvas.height = h; canvas.getContext('2d').drawImage(img, 0, 0, w, h);
       const b64 = canvas.toDataURL('image/jpeg', 0.6);
-      db.ref('modulo_riego').set({ mapa: b64, perimeter: [], zones: [], markers: [] }).then(() => { cargarDatosAlMapa(b64, [], [], [], null); mostrarToast("¡Plano sincronizado!"); });
+      db.ref('modulo_riego').update({ mapa: b64, perimeter: [], zones: [], markers: [], view: null }).then(() => { cargarDatosAlMapa(b64, [], [], [], null); mostrarToast("¡Plano sincronizado!"); });
     }; img.src = e.target.result; 
   }; reader.readAsDataURL(file);
 }
