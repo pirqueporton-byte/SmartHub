@@ -121,17 +121,24 @@
    <a id="local-ota" class="fw-secondary" hidden target="_blank" rel="noopener noreferrer">Abrir OTA local</a>
    <p class="fw-help">La OTA local se abre en el navegador conectado a la misma red del ESP32.</p>
   </section>
-  <section class="fw-card"><div class="fw-heading"><h2>Nuevo firmware</h2><span class="fw-pill">Etapa 1</span></div>
-   <p class="fw-help">Prepara el archivo para instalarlo con la OTA local del dispositivo.</p>
-   <form id="compile-form"><label class="fw-upload" for="source"><strong>Seleccionar archivo .ino</strong><span>Sketch completo · hasta 256 KB</span><input id="source" type="file" accept=".ino" required></label><p id="filename">Ningún archivo seleccionado</p><button id="compile" type="submit" disabled>Compilar</button></form>
+  <section class="fw-card"><div class="fw-heading"><h2>Nuevo firmware</h2><span class="fw-pill">Compilador + OTA</span></div>
+   <p class="fw-help">Compila y descarga el archivo, o solicita su instalación cuando el riego esté inactivo.</p>
+   <form id="compile-form"><label class="fw-upload" for="source"><strong>Seleccionar archivo .ino</strong><span>Sketch completo · hasta 256 KB</span><input id="source" type="file" accept=".ino" required></label><p id="filename">Ningún archivo seleccionado</p><button id="compile" type="submit" disabled>Compilar</button><button id="compile-install" type="submit" disabled>Compilar e instalar</button></form>
    <div class="fw-progress"><p id="build-status" role="status" aria-live="polite">Selecciona el firmware para comenzar.</p><progress id="progress" hidden aria-label="Compilación en curso"></progress></div>
-   <div id="result" hidden><dl class="fw-diagnostics"><div><dt>Versión compilada</dt><dd id="built-version"></dd></div><div><dt>Binario</dt><dd id="size"></dd></div></dl><label for="sha">SHA-256</label><code id="sha"></code><button id="download" type="button">Descargar .bin</button></div>
+   <div id="result" hidden><dl class="fw-diagnostics"><div><dt>Versión compilada</dt><dd id="built-version"></dd></div><div><dt>Binario</dt><dd id="size"></dd></div></dl><label for="sha">SHA-256</label><code id="sha"></code><button id="download" type="button">Descargar .bin</button><button id="install" type="button" disabled>Instalar en Riego</button></div>
    <details id="logs" hidden><summary>Registro de compilación</summary><pre id="log"></pre></details>
    <p id="service-note" class="fw-help"></p>
    <details><summary>Compilaciones recientes</summary><ul id="history"></ul></details>
   </section>
  </div>
- <p class="fw-help">La instalación automática se habilitará en una etapa posterior, después de validar este compilador.</p>
+ <section class="fw-card fw-ota"><h2>Actualización del dispositivo</h2>
+ <p id="ota-readiness" class="fw-help">Comprobando disponibilidad…</p>
+ <p id="ota-status" role="status" aria-live="polite">No hay una actualización seleccionada.</p>
+ <progress id="ota-progress" max="100" value="0" hidden aria-label="Instalación remota"></progress>
+ <p id="ota-detail" class="fw-help"></p>
+ <a id="device-setup" class="fw-secondary" target="_blank" rel="noopener noreferrer" hidden>Configurar conexión del ESP32</a>
+ <p class="fw-help">Una orden pendiente no detiene el riego. La primera instalación del firmware con OTA remota se realiza desde la OTA local.</p>
+ </section>
  </div>
 </main>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -140,5 +147,5 @@
 <script src="firmware-ui/config.js"></script>
 <script src="firmware-ui/vendor/fflate-0.8.2.js"></script>
 <script src="firmware-ui/artifact.js"></script>
-<script src="firmware-ui/firmware.js"></script>
+<script src="firmware-ui/firmware.js?v=20260921-ota1"></script>
 </body></html>

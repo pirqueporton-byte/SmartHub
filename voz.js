@@ -319,6 +319,12 @@
   async function leerRuta(ruta) {
     const db = getDB();
     if (!db) throw new Error('Firebase todavía no está disponible');
+    // Read only the operational children; OTA metadata has separate permissions.
+    if (ruta === 'modulo_riego') {
+      const keys = ['zones', 'estado_riego', 'comando'];
+      const snapshots = await Promise.all(keys.map(key => db.ref(ruta + '/' + key).once('value')));
+      return Object.fromEntries(keys.map((key, index) => [key, snapshots[index].val()]));
+    }
     const snap = await db.ref(ruta).once('value');
     return snap.val();
   }

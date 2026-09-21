@@ -50,6 +50,12 @@
   async function leer(ruta) {
     const d = getDB();
     if (!d) throw new Error('Firebase no está disponible en esta página.');
+    // Read only the operational children; OTA metadata has separate permissions.
+    if (ruta === 'modulo_riego') {
+      const keys = ['zones', 'estado_riego', 'comando'];
+      const snapshots = await Promise.all(keys.map(key => d.ref(ruta + '/' + key).once('value')));
+      return Object.fromEntries(keys.map((key, index) => [key, snapshots[index].val()]));
+    }
     const snap = await d.ref(ruta).once('value');
     return snap.val();
   }
