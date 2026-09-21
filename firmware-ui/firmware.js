@@ -63,9 +63,30 @@ $('compile-form').onsubmit=async e=>{
 };
 $('download').onclick=async()=>{
  $('download').disabled=true;
- try{const m=manifest;if(!m)throw new Error('Falta manifiesto.');const archive=await request('/builds/'+current+'/artifact',{},'blob');
- const blob=await firmwareFromArtifact(archive,m);
- const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`${m.version}.bin`;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);
+ try{
+  const m=manifest;if(!m)throw new Error('Falta manifiesto.');
+  const native=!!window.SmartHubAndroid;
+  if(native){
+   if(!window.SmartHubNative?.rpc)throw new Error('Espera a que la app termine de cargar y vuelve a intentarlo.');
+   try{await SmartHubNative.rpc('firmware-capabilities');}catch{throw new Error('Actualiza la APK a 0.4.1 o posterior para guardar archivos. Mientras tanto, descarga desde la PWA.');}
+  }
+  status('Descargando y verificando el firmware…');
+  const archive=await request('/builds/'+current+'/artifact',{},'blob');
+  const blob=await firmwareFromArtifact(archive,m),name=`${m.version}.bin`;
+  if(native){
+   const bytes=new Uint8Array(await blob.arrayBuffer());
+   await SmartHubNative.rpc('firmware-begin',{name,size:bytes.length,sha256:m.sha256});
+   for(let offset=0;offset<bytes.length;offset+=12288){
+    const base64=btoa(String.fromCharCode(...bytes.subarray(offset,offset+12288)));
+    await SmartHubNative.rpc('firmware-chunk',{offset,base64});
+   }
+   status('Elige dónde guardar el archivo en Android…');
+   await SmartHubNative.rpc('firmware-save');
+   status('✓ Firmware guardado correctamente.');
+  }else{
+   const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+   status('Archivo enviado al navegador. Revisa Descargas.');
+  }
  }catch(e){status(e.message,true);}finally{$('download').disabled=false;}
 };
 auth.onAuthStateChanged(async user=>{

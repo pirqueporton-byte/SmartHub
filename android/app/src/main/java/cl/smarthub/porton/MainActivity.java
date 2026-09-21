@@ -24,6 +24,16 @@ public class MainActivity extends Activity {
  private long navigation;
  private ValueCallback<Uri[]> files;
  private boolean resumed,pendingStart;
+ private FirmwareBuffer firmwareBuffer;
+ private byte[] firmwareBytes;
+ private JavaScriptReplyProxy firmwareReply;
+ private String firmwareReplyId;
+ private boolean savingFirmware;
+ private void cancelFirmware(){
+  firmwareBuffer=null;firmwareBytes=null;
+  if(firmwareReply!=null)answer(firmwareReply,firmwareReplyId,false,"Guardado cancelado.");
+  firmwareReply=null;firmwareReplyId=null;
+ }
  private LinearLayout root;
  static boolean trusted(String url){
   if(url==null)return false;
@@ -58,7 +68,7 @@ public class MainActivity extends Activity {
     if(trusted(request.getUrl().toString()))return false;
     state.setText("Enlace externo: abre SmartHub desde tu navegador para visitarlo");return true;
    }
-   @Override public void onPageStarted(WebView v,String url,android.graphics.Bitmap icon){navigation++;state.setVisibility(android.view.View.GONE);}
+   @Override public void onPageStarted(WebView v,String url,android.graphics.Bitmap icon){navigation++;cancelFirmware();state.setVisibility(android.view.View.GONE);}
    @Override public void onPageFinished(WebView v,String url){
     if(!trusted(url))return;
     state.setVisibility(android.view.View.GONE);
@@ -99,6 +109,11 @@ public class MainActivity extends Activity {
   if(raw==null||raw.length()>24000)return;String id="";
   try{
    org.json.JSONObject data=new org.json.JSONObject(raw);id=data.optString("id");if(!id.matches("[0-9]{1,12}"))return;final String key=id;
+   if(data.optString("type").startsWith("firmware-")) {
+    try { firmwareMessage(data,reply,id); }
+    catch(Exception e){cancelFirmware();answer(reply,id,null,"No se pudo guardar el firmware. Vuelve a descargarlo.");}
+    return;
+   }
    switch(data.optString("type")){
     case "session":NativeSession.accept(this,data.getString("uid"),data.getString("refresh"));answer(reply,id,true,null);break;
     case "logout":NativeSession.clear(this);MariaEngine.get(this).clear();answer(reply,id,true,null);break;
@@ -127,6 +142,39 @@ public class MainActivity extends Activity {
     default:answer(reply,id,null,"Función no disponible.");
    }
   }catch(Exception e){answer(reply,id,null,"No pude preparar la función. Vuelve a iniciar sesión si el problema continúa.");}
+ }
+ private void firmwareMessage(JSONObject data,JavaScriptReplyProxy reply,String id) throws Exception {
+  if(!trusted(web.getUrl()) || !"/SmartHub/admin_firmware.html".equals(Uri.parse(web.getUrl()).getPath()))throw new Exception();
+  switch(data.getString("type")){
+   case "firmware-capabilities":answer(reply,id,true,null);return;
+   case "firmware-begin":
+    if(savingFirmware || firmwareReply!=null){answer(reply,id,null,"Termina el guardado anterior.");return;}
+    firmwareBuffer=new FirmwareBuffer(data.getString("name"),data.getInt("size"),data.getString("sha256"));
+    answer(reply,id,true,null);return;
+   case "firmware-chunk":
+    if(firmwareBuffer==null || firmwareReply!=null)throw new Exception();
+    firmwareBuffer.append(data.getInt("offset"),data.getString("base64"));answer(reply,id,true,null);return;
+   case "firmware-save":
+    if(firmwareBuffer==null || firmwareReply!=null || savingFirmware)throw new Exception();
+    firmwareBytes=firmwareBuffer.finish();firmwareReply=reply;firmwareReplyId=id;
+    Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/octet-stream").putExtra(Intent.EXTRA_TITLE,firmwareBuffer.name);
+    startActivityForResult(intent,52);return;
+   default:throw new Exception();
+  }
+ }
+ private void saveFirmwareResult(int result,Intent data){
+  if(firmwareReply==null)return;
+  if(result!=RESULT_OK || data==null || data.getData()==null){cancelFirmware();return;}
+  final Uri uri=data.getData();final byte[] bytes=firmwareBytes;final JavaScriptReplyProxy reply=firmwareReply;final String id=firmwareReplyId;
+  firmwareReply=null;firmwareReplyId=null;firmwareBytes=null;firmwareBuffer=null;savingFirmware=true;
+  new Thread(()->{
+   String error=null;
+   try(java.io.OutputStream out=getContentResolver().openOutputStream(uri,"w")){
+    if(out==null || bytes==null)throw new java.io.IOException();out.write(bytes);out.flush();
+   }catch(Exception e){error="No se pudo guardar el archivo. Revisa el espacio disponible y vuelve a intentarlo.";try{android.provider.DocumentsContract.deleteDocument(getContentResolver(),uri);}catch(Exception ignored){}}
+   final String failure=error;
+   runOnUiThread(()->{savingFirmware=false;if(isDestroyed())return;answer(reply,id,failure==null,failure);Toast.makeText(this,failure==null?"Firmware guardado correctamente":failure,Toast.LENGTH_LONG).show();});
+  },"firmware-save").start();
  }
  private void startListening(){
   if(!resumed||getSystemService(KeyguardManager.class).isKeyguardLocked())return;
@@ -170,8 +218,9 @@ public class MainActivity extends Activity {
  private void fail(JavaScriptReplyProxy reply,String message){try{reply.postMessage(new JSONObject().put("error",message).toString());}catch(Exception ignored){}}
  @Override protected void onActivityResult(int request,int result,Intent data){
   super.onActivityResult(request,result,data);
+  if(request==52){saveFirmwareResult(result,data);return;}
   if(request==51&&files!=null){files.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result,data));files=null;}
  }
  @Override public void onBackPressed(){if(web!=null&&web.canGoBack())web.goBack();else super.onBackPressed();}
- @Override protected void onDestroy(){if(loginCancellation!=null)loginCancellation.cancel();if(web!=null)web.destroy();super.onDestroy();}
+ @Override protected void onDestroy(){cancelFirmware();if(loginCancellation!=null)loginCancellation.cancel();if(web!=null)web.destroy();super.onDestroy();}
 }
